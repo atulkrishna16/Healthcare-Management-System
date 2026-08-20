@@ -7,6 +7,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
+const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 const authRoutes = require('./routes/auth');
@@ -15,6 +16,9 @@ const appointmentRoutes = require('./routes/appointments');
 const adminRoutes = require('./routes/admin');
 
 const app = express();
+
+// Trust proxy for rate limiting behind reverse proxies/Vercel/Fly/Render
+app.set('trust proxy', 1);
 
 // ── Security & Parsing ────────────────────────────────────────────────────────
 app.use(helmet());
@@ -28,13 +32,16 @@ app.use(morgan('combined', {
   stream: { write: (msg) => logger.info(msg.trim()) },
 }));
 
+// ── Global API Rate Limiter ───────────────────────────────────────────────────
+app.use(apiLimiter);
+
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // ── Route Groups ──────────────────────────────────────────────────────────────
-app.use('/auth', authRoutes);
+app.use('/auth', authLimiter, authRoutes);
 app.use('/doctors', doctorRoutes);
 app.use('/appointments', appointmentRoutes);
 app.use('/admin', adminRoutes);
