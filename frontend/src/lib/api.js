@@ -1,0 +1,92 @@
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  timeout: 30000,
+});
+
+// ── Request interceptor: attach access token ───────────────────────────────
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('accessToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// ── Response interceptor: handle 401, refresh token ───────────────────────
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+
+    if (error.response?.status === 401 && !original._retry) {
+      original._retry = true;
+      const refreshToken = localStorage.getItem('refreshToken');
+
+      if (refreshToken) {
+        try {
+          const res = await axios.post(
+            `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/auth/refresh`,
+            { refreshToken }
+          );
+          const { accessToken } = res.data;
+          localStorage.setItem('accessToken', accessToken);
+          original.headers.Authorization = `Bearer ${accessToken}`;
+          return api(original);
+        } catch {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/login';
+        }
+      } else {
+        localStorage.removeItem('accessToken');
+        window.location.href = '/login';
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+export const authApi = {
+  register: (data) => api.post('/auth/register', data),
+  login: (data) => api.post('/auth/login', data),
+  refresh: (refreshToken) => api.post('/auth/refresh', { refreshToken }),
+  me: () => api.get('/auth/me'),
+};
+
+// ── Doctors ────────────────────────────────────────────────────────────────
+export const doctorsApi = {
+  search: (params) => api.get('/doctors', { params }),
+  getSlots: (doctorId, date) => api.get(`/doctors/${doctorId}/slots`, { params: { date } }),
+};
+
+// ── Appointments ───────────────────────────────────────────────────────────
+export const appointmentsApi = {
+  list: () => api.get('/appointments'),
+  get: (id) => api.get(`/appointments/${id}`),
+  hold: (data) => api.post('/appointments/hold', data),
+  submitSymptoms: (id, data) => api.post(`/appointments/${id}/symptoms`, data),
+  confirm: (id) => api.post(`/appointments/${id}/confirm`),
+  cancel: (id) => api.post(`/appointments/${id}/cancel`),
+  reschedule: (id, data) => api.post(`/appointments/${id}/reschedule`, data),
+  submitNotes: (id, data) => api.post(`/appointments/${id}/notes`, data),
+};
+
+// ── Admin ──────────────────────────────────────────────────────────────────
+export const adminApi = {
+  stats: () => api.get('/admin/stats'),
+  getDoctors: () => api.get('/admin/doctors'),
+  createDoctor: (data) => api.post('/admin/doctors', data),
+  updateDoctor: (id, data) => api.patch(`/admin/doctors/${id}`, data),
+  deleteDoctor: (id) => api.delete(`/admin/doctors/${id}`),
+  getDoctorLeave: (id) => api.get(`/admin/doctors/${id}/leave`),
+  addLeave: (id, data) => api.post(`/admin/doctors/${id}/leave`, data),
+  deleteLeave: (doctorId, leaveId) => api.delete(`/admin/doctors/${doctorId}/leave/${leaveId}`),
+  getNotifications: (params) => api.get('/admin/notifications', { params }),
+  retryNotification: (id) => api.post(`/admin/notifications/${id}/retry`),
+};
+
+export default api;
