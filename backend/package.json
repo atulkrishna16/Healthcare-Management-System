@@ -10,7 +10,7 @@
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "generate": "prisma generate",
-    "seed": "node src/prisma/seed.js",
+    "seed": "node prisma/seed.js",
     "test": "jest --runInBand --testTimeout=30000",
     "test:concurrency": "jest tests/concurrency.test.js --runInBand"
   },
