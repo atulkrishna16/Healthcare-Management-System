@@ -2,32 +2,29 @@ const rateLimit = require('express-rate-limit');
 
 /**
  * Global rate limiter applied to all incoming API requests.
- * Allows 100 requests per 15 minutes per IP.
  */
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  message: {
-    error: 'Too many requests from this IP, please try again after 15 minutes.',
-    status: 429,
-  },
-  skip: (req) => req.path === '/health', // Skip health check
-});
-
-/**
- * Stricter rate limiter for authentication endpoints (login, register)
- * to prevent credential stuffing and brute-force attacks.
- * Allows 10 requests per 15 minutes per IP.
- */
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 login/register attempts per windowMs
+  max: 1000, // Generous limit for demo & dev testing
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    error: 'Too many authentication attempts. Please wait 15 minutes before trying again.',
+    error: 'Too many requests, please try again later.',
+    status: 429,
+  },
+  skip: (req) => req.path === '/health',
+});
+
+/**
+ * Auth rate limiter for login/register endpoints.
+ */
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500, // Generous limit for testing & demo accounts
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many authentication attempts. Please wait a few moments before trying again.',
     status: 429,
   },
 });
