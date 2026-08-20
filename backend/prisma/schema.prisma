@@ -1,0 +1,199 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  patient
+  doctor
+  admin
+}
+
+enum AppointmentStatus {
+  held
+  confirmed
+  cancelled
+  completed
+  doctor_leave_cancelled
+}
+
+enum NotificationChannel {
+  email
+  calendar
+}
+
+enum NotificationType {
+  booking_confirm
+  reminder
+  cancellation
+  leave_notice
+  med_reminder
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  retrying
+  failed
+}
+
+enum AiStatus {
+  pending
+  ok
+  failed
+}
+
+enum CalendarSyncStatus {
+  pending
+  synced
+  failed
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  doctorProfile      DoctorProfile?
+  patientAppointments Appointment[] @relation("PatientAppointments")
+
+  @@map("users")
+}
+
+model DoctorProfile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialisation String
+  slotDuration   Int      @default(30) // minutes
+  timezone       String   @default("UTC")
+  bio            String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workingHours DoctorWorkingHours[]
+  leaves       DoctorLeave[]
+  appointments Appointment[]        @relation("DoctorAppointments")
+
+  @@map("doctor_profiles")
+}
+
+model DoctorWorkingHours {
+  id        String        @id @default(uuid())
+  doctorId  String
+  doctor    DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  dayOfWeek Int // 0=Sunday, 1=Monday, ..., 6=Saturday
+  startTime String // "HH:MM" in doctor's timezone
+  endTime   String // "HH:MM" in doctor's timezone
+
+  @@unique([doctorId, dayOfWeek])
+  @@map("doctor_working_hours")
+}
+
+model DoctorLeave {
+  id        String        @id @default(uuid())
+  doctorId  String
+  doctor    DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  date      DateTime      @db.Date
+  reason    String?
+  createdAt DateTime      @default(now())
+
+  @@unique([doctorId, date])
+  @@map("doctor_leave")
+}
+
+model Appointment {
+  id             String            @id @default(uuid())
+  doctorId       String
+  doctor         DoctorProfile     @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  patientId      String
+  patient        User              @relation("PatientAppointments", fields: [patientId], references: [id])
+  slotStart      DateTime
+  slotEnd        DateTime
+  status         AppointmentStatus @default(held)
+  holdExpiresAt  DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  symptomForm    SymptomForm?
+  visitNote      VisitNote?
+  notifications  Notification[]
+  calendarEvent  CalendarEvent?
+
+  // ── Critical constraint: prevents double-booking at DB level ──
+  @@unique([doctorId, slotStart])
+  @@map("appointments")
+}
+
+model SymptomForm {
+  id            String      @id @default(uuid())
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  symptoms      String
+  aiSummary     Json?       // { urgency, chiefComplaint, suggestedQuestions[] }
+  aiStatus      AiStatus    @default(pending)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("symptom_forms")
+}
+
+model VisitNote {
+  id             String      @id @default(uuid())
+  appointmentId  String      @unique
+  appointment    Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  notes          String
+  prescription   Json?       // [{ drug, dosage, frequency, durationDays }]
+  patientSummary String?
+  aiStatus       AiStatus    @default(pending)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@map("visit_notes")
+}
+
+model Notification {
+  id            String              @id @default(uuid())
+  appointmentId String?
+  appointment   Appointment?        @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  channel       NotificationChannel
+  type          NotificationType
+  status        NotificationStatus  @default(pending)
+  attempts      Int                 @default(0)
+  lastError     String?
+  scheduledFor  DateTime            @default(now())
+  payload       Json                // email/calendar payload
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@map("notifications")
+}
+
+model CalendarEvent {
+  id             String            @id @default(uuid())
+  appointmentId  String            @unique
+  appointment    Appointment       @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  googleEventId  String?
+  syncStatus     CalendarSyncStatus @default(pending)
+  lastError      String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@map("calendar_events")
+}
