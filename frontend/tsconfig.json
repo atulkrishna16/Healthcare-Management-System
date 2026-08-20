@@ -5,11 +5,13 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
+    "allowJs": true,
+    "checkJs": false,
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src/**/*"]
 }
