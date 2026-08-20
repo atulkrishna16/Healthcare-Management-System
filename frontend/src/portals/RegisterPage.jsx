@@ -25,7 +25,9 @@ export default function RegisterPage() {
       toast.success('Registration complete! Welcome to HMS.');
       navigate('/patient');
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed');
+      const msg = err.response?.data?.error || err.response?.data?.details?.[0]?.msg || err.message || 'Registration failed';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

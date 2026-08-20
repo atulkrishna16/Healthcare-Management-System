@@ -22,7 +22,9 @@ export default function LoginPage() {
       toast.success(`Welcome back, ${user.name}`);
       navigate(`/${user.role}`);
     } catch (err) {
-      setError(err.response?.data?.error || 'Authentication failed. Check credentials.');
+      const msg = err.response?.data?.error || err.message || 'Authentication failed. Check credentials.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -42,7 +44,9 @@ export default function LoginPage() {
       toast.success(`Logged in as Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`);
       navigate(`/${user.role}`);
     } catch (err) {
-      setError(err.response?.data?.error || 'Demo login failed');
+      const msg = err.response?.data?.error || err.message || 'Demo login failed';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
