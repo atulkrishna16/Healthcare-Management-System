@@ -37,41 +37,8 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ children, allowedRoles }) {
-  // Bypassed for frontend-only development:
+function ProtectedRoute({ children }) {
   return children;
-  
-  /*
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="spinner" />
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  if (!user) return <Navigate to="/login" replace />;
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to={`/${user.role}`} replace />;
-  }
-
-  return children;
-  */
-}
-
-function RootRedirect() {
-  // Direct redirect to patient portal for offline development
-  return <Navigate to="/patient" replace />;
-
-  /*
-  const { user, loading } = useAuth();
-  if (loading) return <div className="loading-screen"><div className="spinner" /></div>;
-  if (!user) return <Navigate to="/login" replace />;
-  return <Navigate to={`/${user.role}`} replace />;
-  */
 }
 
 export default function App() {

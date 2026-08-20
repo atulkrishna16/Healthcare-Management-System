@@ -9,3 +9,4 @@ logs/
 service-account.json
 .DS_Store
 **/.DS_Store
+.agents
