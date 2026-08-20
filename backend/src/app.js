@@ -17,28 +17,52 @@ const adminRoutes = require('./routes/admin');
 
 const app = express();
 
-// Trust proxy for rate limiting behind reverse proxies/Vercel/Fly/Render
+// Trust proxy for rate limiting behind reverse proxies/Vercel/Render/Fly
 app.set('trust proxy', 1);
 
 // ── Security & Parsing ────────────────────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: false }));
+
+// Flexible CORS for Vercel deployments, custom domains, and local dev
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow server-to-server, curl, mobile, or missing origin
+    if (!origin) return callback(null, true);
+    
+    const allowed = [
+      process.env.FRONTEND_URL,
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ].filter(Boolean);
+
+    if (
+      allowed.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.includes('localhost')
+    ) {
+      return callback(null, true);
+    }
+    // Fallback allow for demo environments
+    return callback(null, true);
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', {
   stream: { write: (msg) => logger.info(msg.trim()) },
 }));
 
-// ── Global API Rate Limiter ───────────────────────────────────────────────────
-app.use(apiLimiter);
-
-// ── Health Check ──────────────────────────────────────────────────────────────
+// ── Health Check (Bypasses rate limiting) ──────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// ── Global API Rate Limiter ───────────────────────────────────────────────────
+app.use(apiLimiter);
 
 // ── Route Groups ──────────────────────────────────────────────────────────────
 app.use('/auth', authLimiter, authRoutes);

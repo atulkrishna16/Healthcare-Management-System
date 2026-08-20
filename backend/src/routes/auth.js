@@ -16,10 +16,13 @@ const validate = (req, res, next) => {
 
 const generateTokens = (user) => {
   const payload = { id: user.id, email: user.email, role: user.role };
-  const accessToken = jwt.sign(payload, process.env.JWT_ACCESS_SECRET, {
+  const accessSecret = process.env.JWT_ACCESS_SECRET || 'healthcare_access_secret_super_long_32chars_minimum';
+  const refreshSecret = process.env.JWT_REFRESH_SECRET || 'healthcare_refresh_secret_super_long_32chars_min';
+
+  const accessToken = jwt.sign(payload, accessSecret, {
     expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   });
-  const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
+  const refreshToken = jwt.sign(payload, refreshSecret, {
     expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   });
   return { accessToken, refreshToken };
@@ -42,7 +45,7 @@ router.post(
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: { email, passwordHash, name, role: 'patient' },
       select: { id: true, email: true, name: true, role: true },
@@ -64,16 +67,17 @@ router.post(
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const { accessToken, refreshToken } = generateTokens(user);
 
+    logger.info(`User logged in: ${user.email} (${user.role})`);
     res.json({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
       accessToken,
@@ -90,7 +94,8 @@ router.post('/refresh', async (req, res) => {
   }
 
   try {
-    const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const refreshSecret = process.env.JWT_REFRESH_SECRET || 'healthcare_refresh_secret_super_long_32chars_min';
+    const payload = jwt.verify(refreshToken, refreshSecret);
     const user = await prisma.user.findUnique({ where: { id: payload.id } });
     if (!user) return res.status(401).json({ error: 'User not found' });
 
