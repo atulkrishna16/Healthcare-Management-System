@@ -30,13 +30,17 @@ async function enqueueNotification({ type, channel, payload, appointmentId, sche
     },
   });
 
-  await notificationQueue.add(
-    `${type}:${channel}:${notification.id}`,
-    { notificationId: notification.id },
-    { delay }
-  );
+  try {
+    await notificationQueue.add(
+      `${type}:${channel}:${notification.id}`,
+      { notificationId: notification.id },
+      { delay }
+    );
+    logger.debug(`Enqueued notification ${notification.id} (${type}/${channel})`);
+  } catch (err) {
+    logger.warn(`Could not add notification ${notification.id} to Redis queue: ${err.message}. Stored in DB.`);
+  }
 
-  logger.debug(`Enqueued notification ${notification.id} (${type}/${channel})`);
   return notification;
 }
 
@@ -44,11 +48,15 @@ async function enqueueNotification({ type, channel, payload, appointmentId, sche
  * Re-enqueue an existing notification by DB id (for admin retry)
  */
 async function enqueueNotificationById(notificationId) {
-  await notificationQueue.add(
-    `retry:${notificationId}`,
-    { notificationId },
-    { delay: 0 }
-  );
+  try {
+    await notificationQueue.add(
+      `retry:${notificationId}`,
+      { notificationId },
+      { delay: 0 }
+    );
+  } catch (err) {
+    logger.warn(`Could not retry notification ${notificationId} in Redis: ${err.message}`);
+  }
 }
 
 module.exports = { notificationQueue, enqueueNotification, enqueueNotificationById };

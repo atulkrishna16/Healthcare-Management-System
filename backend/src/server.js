@@ -7,21 +7,19 @@ const { startScheduledJobs } = require('./jobs/scheduler');
 const PORT = process.env.PORT || 3001;
 
 async function start() {
+  // Start Express API Server
+  app.listen(PORT, () => {
+    logger.info(`🚀 Healthcare API server listening on http://localhost:${PORT}`);
+  });
+
+  // Attempt to initialize background queues asynchronously
   try {
-    // Start BullMQ workers
     await startWorkers();
-    logger.info('✅ BullMQ workers started');
-
-    // Start recurring scheduled jobs (expiry cleanup, reminders)
+    logger.info('✅ BullMQ background workers initialized');
     await startScheduledJobs();
-    logger.info('✅ Scheduled jobs started');
-
-    app.listen(PORT, () => {
-      logger.info(`🚀 Healthcare API running on http://localhost:${PORT}`);
-    });
+    logger.info('✅ Scheduled background jobs started');
   } catch (err) {
-    logger.error('Failed to start server:', err);
-    process.exit(1);
+    logger.warn(`⚠️  Background workers paused (${err.message}). API server remains fully operational.`);
   }
 }
 
