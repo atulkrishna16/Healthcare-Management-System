@@ -8,75 +8,42 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    const savedUser = localStorage.getItem('offlineUser');
+    // Clear legacy offline mocks
+    localStorage.removeItem('offlineUser');
     
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      setLoading(false);
-    } else if (token) {
+    const token = localStorage.getItem('accessToken');
+    if (token && token !== 'mock-access-token') {
       authApi.me()
         .then((res) => setUser(res.data))
         .catch(() => {
-          // If server is offline but token exists, mock a guest patient so we don't block dev
-          setUser({ id: 'mock-1', email: 'guest@example.com', name: 'Guest Developer', role: 'patient' });
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          setUser(null);
         })
         .finally(() => setLoading(false));
     } else {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
       setLoading(false);
     }
   }, []);
 
   const login = useCallback(async ({ email, password }) => {
-    try {
-      const res = await authApi.login({ email, password });
-      const { user, accessToken, refreshToken } = res.data;
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      setUser(user);
-      return user;
-    } catch (err) {
-      // IF SERVER IS OFFLINE (connection refused / 5xx) or manual mock triggers:
-      if (!err.response || err.response.status >= 500) {
-        let role = 'patient';
-        let name = 'Alice Patient (Offline)';
-        
-        if (email.includes('admin')) {
-          role = 'admin';
-          name = 'Admin User (Offline)';
-        } else if (email.includes('doctor') || email.includes('mitchell') || email.includes('patel')) {
-          role = 'doctor';
-          name = 'Dr. Mitchell (Offline)';
-        }
-        
-        const mockUser = { id: 'mock-id', email, name, role };
-        localStorage.setItem('accessToken', 'mock-access-token');
-        localStorage.setItem('offlineUser', JSON.stringify(mockUser));
-        setUser(mockUser);
-        return mockUser;
-      }
-      throw err;
-    }
+    const res = await authApi.login({ email, password });
+    const { user, accessToken, refreshToken } = res.data;
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+    setUser(user);
+    return user;
   }, []);
 
   const register = useCallback(async ({ email, password, name }) => {
-    try {
-      const res = await authApi.register({ email, password, name });
-      const { user, accessToken, refreshToken } = res.data;
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      setUser(user);
-      return user;
-    } catch (err) {
-      if (!err.response || err.response.status >= 500) {
-        const mockUser = { id: 'mock-id', email, name, role: 'patient' };
-        localStorage.setItem('accessToken', 'mock-access-token');
-        localStorage.setItem('offlineUser', JSON.stringify(mockUser));
-        setUser(mockUser);
-        return mockUser;
-      }
-      throw err;
-    }
+    const res = await authApi.register({ email, password, name });
+    const { user, accessToken, refreshToken } = res.data;
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+    setUser(user);
+    return user;
   }, []);
 
   const logout = useCallback(() => {

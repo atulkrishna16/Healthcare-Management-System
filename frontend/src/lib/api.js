@@ -8,7 +8,7 @@ const api = axios.create({
 // ── Request interceptor: attach access token ───────────────────────────────
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
-  if (token) {
+  if (token && token !== 'mock-access-token') {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -59,7 +59,10 @@ export const authApi = {
 
 // ── Doctors ────────────────────────────────────────────────────────────────
 export const doctorsApi = {
-  search: (params) => api.get('/doctors', { params }),
+  search: (params) => {
+    const query = typeof params === 'string' ? (params === 'All' ? {} : { specialisation: params }) : params;
+    return api.get('/doctors', { params: query });
+  },
   getSlots: (doctorId, date) => api.get(`/doctors/${doctorId}/slots`, { params: { date } }),
 };
 
