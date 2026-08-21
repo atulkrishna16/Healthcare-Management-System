@@ -15,6 +15,12 @@ import {
   Settings,
   Sparkles,
   CalendarDays,
+  Sun,
+  Sunrise,
+  Moon,
+  Building,
+  Wand2,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 const DAYS = [
@@ -27,6 +33,41 @@ const DAYS = [
   { id: 0, name: 'Sunday' },
 ];
 
+const PRESETS = [
+  {
+    id: 'morning',
+    name: 'Morning Shift',
+    icon: Sunrise,
+    startTime: '08:00',
+    endTime: '12:00',
+    description: 'Slices multiple slots across 08:00 AM – 12:00 PM',
+  },
+  {
+    id: 'afternoon',
+    name: 'Forenoon / Afternoon',
+    icon: Sun,
+    startTime: '12:00',
+    endTime: '16:00',
+    description: 'Slices multiple slots across 12:00 PM – 04:00 PM',
+  },
+  {
+    id: 'evening',
+    name: 'Evening / Night Shift',
+    icon: Moon,
+    startTime: '17:00',
+    endTime: '21:00',
+    description: 'Slices multiple slots across 05:00 PM – 09:00 PM',
+  },
+  {
+    id: 'fullday',
+    name: 'Full Day Shift',
+    icon: Building,
+    startTime: '09:00',
+    endTime: '17:00',
+    description: 'Slices all-day consecutive slots across 09:00 AM – 05:00 PM',
+  },
+];
+
 function generatePreviewSlots(startTime, endTime, durationMinutes) {
   if (!startTime || !endTime || !durationMinutes || durationMinutes <= 0) return [];
   const [startH, startM] = startTime.split(':').map(Number);
@@ -37,8 +78,15 @@ function generatePreviewSlots(startTime, endTime, durationMinutes) {
 
   const slots = [];
   while (current.add(durationMinutes, 'minute').isBefore(end) || current.add(durationMinutes, 'minute').isSame(end)) {
-    slots.push(current.format('h:mm A'));
-    current = current.add(durationMinutes, 'minute');
+    const slotStartFormatted = current.format('h:mm A');
+    const nextTime = current.add(durationMinutes, 'minute');
+    const slotEndFormatted = nextTime.format('h:mm A');
+    slots.push({
+      start: slotStartFormatted,
+      end: slotEndFormatted,
+      label: `${slotStartFormatted} – ${slotEndFormatted}`,
+    });
+    current = nextTime;
   }
   return slots;
 }
@@ -52,12 +100,13 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
     enabled: isOpen,
   });
 
+  const [mode, setMode] = useState('preset'); // 'preset' | 'manual'
   const [slotDuration, setSlotDuration] = useState(30);
   const [workingDays, setWorkingDays] = useState([]);
   const [leaveDate, setLeaveDate] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [previewDayId, setPreviewDayId] = useState(1);
+  const [selectedDayId, setSelectedDayId] = useState(1);
 
   useEffect(() => {
     if (scheduleData) {
@@ -85,7 +134,29 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
     );
   };
 
-  const selectedDayConfig = workingDays.find((d) => d.dayOfWeek === previewDayId) || workingDays[0];
+  const applyPresetToDay = (dayId, preset) => {
+    setWorkingDays((prev) =>
+      prev.map((d) =>
+        d.dayOfWeek === dayId
+          ? { ...d, active: true, startTime: preset.startTime, endTime: preset.endTime }
+          : d
+      )
+    );
+    toast.success(`Applied ${preset.name} (${preset.startTime} – ${preset.endTime})`);
+  };
+
+  const applyPresetToAllActiveDays = (preset) => {
+    setWorkingDays((prev) =>
+      prev.map((d) =>
+        d.active
+          ? { ...d, startTime: preset.startTime, endTime: preset.endTime }
+          : d
+      )
+    );
+    toast.success(`Applied ${preset.name} to all active shifts!`);
+  };
+
+  const selectedDayConfig = workingDays.find((d) => d.dayOfWeek === selectedDayId) || workingDays[0];
   const previewSlots = useMemo(() => {
     if (!selectedDayConfig || !selectedDayConfig.active) return [];
     return generatePreviewSlots(selectedDayConfig.startTime, selectedDayConfig.endTime, Number(slotDuration));
@@ -109,7 +180,7 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
         workingHours: activeWorkingHours,
       });
 
-      toast.success('Shift schedule & slots updated successfully!');
+      toast.success('Shift schedule & slots published successfully!');
       queryClient.invalidateQueries(['doctor-own-schedule']);
       queryClient.invalidateQueries(['doctor-appointments']);
       onClose();
@@ -161,7 +232,7 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
                 Slot & Shift Schedule Builder
               </h2>
               <p className="text-xs text-[#4A6478]">
-                Set your custom working hours and slot duration — slots are generated automatically.
+                Generate multiple bookable slots automatically using presets or manual custom shift hours.
               </p>
             </div>
           </div>
@@ -173,6 +244,35 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
           </button>
         </div>
 
+        {/* Mode Selector Tabs (Automatic Presets vs Manual Custom) */}
+        <div className="grid grid-cols-2 gap-2 p-1 bg-[#F7F8F0] border border-[#7AAACE]/50 rounded-2xl">
+          <button
+            type="button"
+            onClick={() => setMode('preset')}
+            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+              mode === 'preset'
+                ? 'bg-[#355872] text-white shadow-sm'
+                : 'text-[#355872] hover:text-[#233B4D]'
+            }`}
+          >
+            <Wand2 size={14} />
+            1. Automatic Preset Shifts
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMode('manual')}
+            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+              mode === 'manual'
+                ? 'bg-[#355872] text-white shadow-sm'
+                : 'text-[#355872] hover:text-[#233B4D]'
+            }`}
+          >
+            <SlidersHorizontal size={14} />
+            2. Manual Custom Slot Times
+          </button>
+        </div>
+
         {isLoading ? (
           <div className="p-8 text-center text-xs text-[#4A6478]">Loading current availability...</div>
         ) : (
@@ -181,37 +281,94 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
             {/* Slot Duration Selector */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-[#355872] uppercase tracking-wider block">
-                Appointment Slot Duration
+                Appointment Slot Duration (Minutes Per Consultation)
               </label>
-              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 {[15, 20, 30, 45, 60].map((mins) => (
                   <button
                     type="button"
                     key={mins}
                     onClick={() => setSlotDuration(mins)}
-                    className={`py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                    className={`py-2 rounded-xl border text-xs font-bold transition-all ${
                       Number(slotDuration) === mins
                         ? 'bg-[#355872] text-white border-[#355872] shadow-sm'
                         : 'bg-[#F7F8F0] text-[#355872] border-[#7AAACE]/60 hover:bg-white'
                     }`}
                   >
-                    {mins} Mins
+                    {mins}m
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Weekly Working Days & Hours */}
+            {/* ── MODE 1: AUTOMATIC PRESETS ─────────────────────────────────── */}
+            {mode === 'preset' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-[#355872] uppercase tracking-wider block">
+                    Choose Shift Preset (Slices into Multiple Slots)
+                  </label>
+                  <span className="text-[10px] text-[#4A6478] font-bold">
+                    Target: {selectedDayConfig?.name}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {PRESETS.map((preset) => {
+                    const Icon = preset.icon;
+                    return (
+                      <div
+                        key={preset.id}
+                        className="p-3.5 rounded-2xl bg-[#F7F8F0] border border-[#7AAACE]/60 hover:border-[#355872] transition space-y-2"
+                      >
+                        <div className="flex items-center gap-2 font-bold text-xs text-[#355872]">
+                          <div className="p-1.5 rounded-lg bg-white border border-[#7AAACE]/50">
+                            <Icon size={14} className="text-[#355872]" />
+                          </div>
+                          <span>{preset.name}</span>
+                        </div>
+                        <p className="text-[11px] text-[#4A6478]">{preset.description}</p>
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => applyPresetToDay(selectedDayId, preset)}
+                            className="flex-1 py-1.5 px-2.5 bg-white hover:bg-[#355872] hover:text-white border border-[#7AAACE] text-[#355872] rounded-lg text-[11px] font-bold transition shadow-2xs"
+                          >
+                            Apply to {selectedDayConfig?.name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyPresetToAllActiveDays(preset)}
+                            className="py-1.5 px-2 bg-[#355872]/10 hover:bg-[#355872] hover:text-white text-[#355872] rounded-lg text-[11px] font-bold transition"
+                            title="Apply to all active work days"
+                          >
+                            Apply All
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Active Shifts & Custom Times Per Day ──────────────────────── */}
             <div className="space-y-3">
               <label className="text-xs font-bold text-[#355872] uppercase tracking-wider block">
-                Weekly Active Shifts & Custom Times
+                Weekly Shift Schedule & Custom Start / End Times
               </label>
 
               <div className="space-y-2">
                 {workingDays.map((d) => (
                   <div
                     key={d.dayOfWeek}
-                    className={`p-3 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    onClick={() => setSelectedDayId(d.dayOfWeek)}
+                    className={`p-3 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer ${
+                      selectedDayId === d.dayOfWeek
+                        ? 'ring-2 ring-[#355872] border-[#355872]'
+                        : ''
+                    } ${
                       d.active
                         ? 'bg-white border-[#7AAACE]'
                         : 'bg-[#F7F8F0]/60 border-[#7AAACE]/30 opacity-70'
@@ -223,7 +380,7 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
                         checked={d.active}
                         onChange={() => {
                           toggleDay(d.dayOfWeek);
-                          setPreviewDayId(d.dayOfWeek);
+                          setSelectedDayId(d.dayOfWeek);
                         }}
                         className="w-4 h-4 rounded text-[#355872] focus:ring-[#9CD5FF] border-[#7AAACE]"
                       />
@@ -233,13 +390,13 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
                     </label>
 
                     {d.active ? (
-                      <div className="flex items-center gap-2 text-xs">
+                      <div className="flex items-center gap-2 text-xs" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="time"
                           value={d.startTime}
                           onChange={(e) => {
                             updateTime(d.dayOfWeek, 'startTime', e.target.value);
-                            setPreviewDayId(d.dayOfWeek);
+                            setSelectedDayId(d.dayOfWeek);
                           }}
                           className="px-2.5 py-1.5 rounded-lg border border-[#7AAACE] bg-[#F7F8F0] text-[#355872] font-semibold text-xs focus:outline-none focus:ring-1 focus:ring-[#9CD5FF]"
                         />
@@ -249,7 +406,7 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
                           value={d.endTime}
                           onChange={(e) => {
                             updateTime(d.dayOfWeek, 'endTime', e.target.value);
-                            setPreviewDayId(d.dayOfWeek);
+                            setSelectedDayId(d.dayOfWeek);
                           }}
                           className="px-2.5 py-1.5 rounded-lg border border-[#7AAACE] bg-[#F7F8F0] text-[#355872] font-semibold text-xs focus:outline-none focus:ring-1 focus:ring-[#9CD5FF]"
                         />
@@ -264,31 +421,32 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
 
             {/* Live Generated Slots Preview */}
             {selectedDayConfig?.active && (
-              <div className="p-4 rounded-2xl bg-[#F7F8F0] border border-[#7AAACE]/50 space-y-2.5">
+              <div className="p-4 rounded-2xl bg-[#F7F8F0] border border-[#7AAACE]/60 space-y-2.5">
                 <div className="flex items-center justify-between text-xs font-bold text-[#355872]">
                   <span className="flex items-center gap-1.5">
                     <Sparkles size={14} className="text-[#355872]" />
-                    Live Generated Slots Preview ({selectedDayConfig.name})
+                    Generated Patient Slots Preview ({selectedDayConfig.name}: {selectedDayConfig.startTime} – {selectedDayConfig.endTime})
                   </span>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#9CD5FF]/60 border border-[#7AAACE]/60">
-                    {previewSlots.length} Bookable Slots
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#355872] text-white">
+                    {previewSlots.length} Multiple Slots
                   </span>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-36 overflow-y-auto pt-1">
                   {previewSlots.length > 0 ? (
-                    previewSlots.map((slotTime, idx) => (
-                      <span
+                    previewSlots.map((slot, idx) => (
+                      <div
                         key={idx}
-                        className="px-2.5 py-1 rounded-lg bg-white border border-[#7AAACE]/50 text-[11px] font-bold text-[#355872] shadow-xs"
+                        className="px-2.5 py-1.5 rounded-xl bg-white border border-[#7AAACE]/50 text-center shadow-2xs"
                       >
-                        {slotTime}
-                      </span>
+                        <div className="text-[11px] font-bold text-[#355872]">{slot.start}</div>
+                        <div className="text-[9px] text-[#4A6478] font-semibold">to {slot.end}</div>
+                      </div>
                     ))
                   ) : (
-                    <span className="text-xs text-[#B5533C]">
+                    <div className="col-span-full text-xs text-[#B5533C] py-2">
                       Invalid time range. End time must be later than start time.
-                    </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -299,10 +457,10 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="w-full py-3 bg-[#355872] hover:bg-[#233B4D] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] disabled:opacity-50"
+                className="w-full py-3.5 bg-[#355872] hover:bg-[#233B4D] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] disabled:opacity-50"
               >
                 <Save size={15} />
-                {isSaving ? 'Saving Changes...' : 'Save & Publish Generated Slots'}
+                {isSaving ? 'Publishing Slots...' : 'Publish Generated Slots to Patients'}
               </button>
             </div>
           </form>
