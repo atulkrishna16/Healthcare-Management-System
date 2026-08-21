@@ -43,19 +43,14 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
   useEffect(() => {
     if (scheduleData) {
       setSlotDuration(scheduleData.slotDuration || 30);
-
-      const existingDays = scheduleData.workingHours || [];
-      const initialized = DAYS.map((d) => {
-        const found = existingDays.find((wh) => wh.dayOfWeek === d.id);
-        return {
-          dayOfWeek: d.id,
-          name: d.name,
-          active: !!found,
-          startTime: found ? found.startTime : '09:00',
-          endTime: found ? found.endTime : '17:00',
-        };
-      });
-      setWorkingDays(initialized);
+      const whMap = new Map((scheduleData.workingHours || []).map((h) => [h.dayOfWeek, h]));
+      setWorkingDays(DAYS.map((d) => ({
+        dayOfWeek: d.id,
+        name: d.name,
+        active: whMap.has(d.id),
+        startTime: whMap.get(d.id)?.startTime || '09:00',
+        endTime: whMap.get(d.id)?.endTime || '17:00',
+      })));
     }
   }, [scheduleData]);
 

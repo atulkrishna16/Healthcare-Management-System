@@ -8,40 +8,23 @@ let calendarClient;
 function getServiceAccountCalendar() {
   if (calendarClient) return calendarClient;
 
-  let serviceAccount = null;
-
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    try {
-      serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-    } catch (e) {
-      logger.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON', e);
+  let sa = null;
+  try {
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) sa = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    else if (process.env.GOOGLE_SERVICE_ACCOUNT_PATH && fs.existsSync(process.env.GOOGLE_SERVICE_ACCOUNT_PATH)) {
+      sa = JSON.parse(fs.readFileSync(process.env.GOOGLE_SERVICE_ACCOUNT_PATH, 'utf8'));
+    } else if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+      sa = { client_email: process.env.GOOGLE_CLIENT_EMAIL, private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') };
     }
+  } catch (e) {
+    logger.warn('Failed to parse Google Service Account credentials', e.message);
   }
 
-  if (!serviceAccount && process.env.GOOGLE_SERVICE_ACCOUNT_PATH) {
-    if (fs.existsSync(process.env.GOOGLE_SERVICE_ACCOUNT_PATH)) {
-      try {
-        serviceAccount = JSON.parse(fs.readFileSync(process.env.GOOGLE_SERVICE_ACCOUNT_PATH, 'utf8'));
-      } catch (e) {
-        logger.error('Failed to read service account file', e);
-      }
-    }
-  }
-
-  if (!serviceAccount && process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-    serviceAccount = {
-      client_email: process.env.GOOGLE_CLIENT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    };
-  }
-
-  if (!serviceAccount || !serviceAccount.client_email || !serviceAccount.private_key) {
-    return null;
-  }
+  if (!sa?.client_email || !sa?.private_key) return null;
 
   const auth = new google.auth.JWT({
-    email: serviceAccount.client_email,
-    key: serviceAccount.private_key,
+    email: sa.client_email,
+    key: sa.private_key,
     scopes: ['https://www.googleapis.com/auth/calendar'],
   });
 
