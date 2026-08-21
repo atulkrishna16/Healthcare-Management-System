@@ -67,13 +67,26 @@ export default function AppointmentDetail() {
           </div>
         </div>
 
-        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-          appt.status === 'completed'
-            ? 'bg-[#9CD5FF] text-[#355872] border border-[#7AAACE]'
-            : 'bg-[#9CD5FF]/40 text-[#355872] border border-[#7AAACE]'
-        }`}>
-          {appt.status}
-        </span>
+        <div className="flex items-center gap-2">
+          {['held', 'confirmed'].includes(appt.status) && (
+            <a
+              href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Medical Consultation: ${appt.doctor?.user?.name || 'Physician'}`)}&dates=${dayjs(appt.slotStart).format('YYYYMMDDTHHmmss')}/${dayjs(appt.slotEnd).format('YYYYMMDDTHHmmss')}&details=${encodeURIComponent(`Healthcare Consultation\nDoctor: ${appt.doctor?.user?.name}\nSpecialisation: ${appt.doctor?.specialisation}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-1.5 rounded-xl bg-white border border-[#7AAACE] hover:bg-[#9CD5FF]/20 text-[#355872] text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+            >
+              <CalendarIcon size={14} className="text-[#355872]" />
+              Add to Google Calendar
+            </a>
+          )}
+          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+            appt.status === 'completed'
+              ? 'bg-[#9CD5FF] text-[#355872] border border-[#7AAACE]'
+              : 'bg-[#9CD5FF]/40 text-[#355872] border border-[#7AAACE]'
+          }`}>
+            {appt.status}
+          </span>
+        </div>
       </div>
 
       {/* Primary Details Grid */}
