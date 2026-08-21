@@ -8,6 +8,7 @@ import './index.css';
 import LandingPage from './portals/LandingPage';
 import LoginPage from './portals/LoginPage';
 import RegisterPage from './portals/RegisterPage';
+import NotFoundPage from './portals/NotFoundPage';
 
 // Patient Portal
 import PatientLayout from './portals/patient/PatientLayout';
@@ -108,8 +109,8 @@ export default function App() {
               <Route path="notifications" element={<AdminNotifications />} />
             </Route>
 
-            {/* 404 */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* 404 Custom Not Found */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
