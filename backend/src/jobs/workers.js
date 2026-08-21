@@ -1,7 +1,7 @@
 const { Worker } = require('bullmq');
 const { redisConnection } = require('./redisConnection');
 const prisma = require('../utils/prismaClient');
-const { sendEmail } = require('../services/email/emailService');
+const { sendEmail, escHtml } = require('../services/email/emailService');
 const { createCalendarEvent, patchCalendarEvent, deleteCalendarEvent } = require('../services/calendar/calendarService');
 const logger = require('../utils/logger');
 
@@ -98,9 +98,9 @@ async function handleEmailNotification(notification) {
         subject: 'Appointment Confirmed — Healthcare Manager',
         html: `
           <h2>Appointment Confirmed! 🎉</h2>
-          <p>Dear <strong>${p.patientName}</strong>,</p>
-          <p>Your appointment with <strong>${p.doctorName}</strong> has been confirmed.</p>
-          <p><strong>Date & Time:</strong> ${new Date(p.slotStart).toLocaleString()}</p>
+          <p>Dear <strong>${escHtml(p.patientName)}</strong>,</p>
+          <p>Your appointment with <strong>${escHtml(p.doctorName)}</strong> has been confirmed.</p>
+          <p><strong>Date & Time:</strong> ${escHtml(new Date(p.slotStart).toLocaleString())}</p>
           <p>Please arrive 10 minutes early.</p>
         `,
       });
@@ -112,8 +112,8 @@ async function handleEmailNotification(notification) {
         subject: 'Appointment Cancelled — Healthcare Manager',
         html: `
           <h2>Appointment Cancelled</h2>
-          <p>Dear <strong>${p.patientName}</strong>,</p>
-          <p>Your appointment with <strong>${p.doctorName}</strong> on ${new Date(p.slotStart).toLocaleString()} has been cancelled.</p>
+          <p>Dear <strong>${escHtml(p.patientName)}</strong>,</p>
+          <p>Your appointment with <strong>${escHtml(p.doctorName)}</strong> on ${escHtml(new Date(p.slotStart).toLocaleString())} has been cancelled.</p>
           <p>Please book a new appointment at your convenience.</p>
         `,
       });
@@ -125,9 +125,9 @@ async function handleEmailNotification(notification) {
         subject: 'Appointment Reminder — Tomorrow',
         html: `
           <h2>Appointment Reminder 📅</h2>
-          <p>Dear <strong>${p.patientName}</strong>,</p>
-          <p>This is a reminder for your appointment tomorrow with <strong>${p.doctorName}</strong>.</p>
-          <p><strong>Time:</strong> ${new Date(p.slotStart).toLocaleString()}</p>
+          <p>Dear <strong>${escHtml(p.patientName)}</strong>,</p>
+          <p>This is a reminder for your appointment tomorrow with <strong>${escHtml(p.doctorName)}</strong>.</p>
+          <p><strong>Time:</strong> ${escHtml(new Date(p.slotStart).toLocaleString())}</p>
         `,
       });
       break;
@@ -138,8 +138,8 @@ async function handleEmailNotification(notification) {
         subject: 'Appointment Cancelled — Doctor on Leave',
         html: `
           <h2>Appointment Cancellation Notice</h2>
-          <p>Dear <strong>${p.patientName}</strong>,</p>
-          <p>We regret to inform you that your appointment with <strong>${p.doctorName}</strong> on ${new Date(p.slotStart).toLocaleString()} has been cancelled because the doctor will be on leave.</p>
+          <p>Dear <strong>${escHtml(p.patientName)}</strong>,</p>
+          <p>We regret to inform you that your appointment with <strong>${escHtml(p.doctorName)}</strong> on ${escHtml(new Date(p.slotStart).toLocaleString())} has been cancelled because the doctor will be on leave.</p>
           <p>We apologize for the inconvenience. Please book a new appointment.</p>
         `,
       });
@@ -148,15 +148,15 @@ async function handleEmailNotification(notification) {
     case 'med_reminder':
       await sendEmail({
         to: p.patientEmail,
-        subject: `Medication Reminder: ${p.drug}`,
+        subject: `Medication Reminder: ${escHtml(p.drug || p.medication)}`,
         html: `
           <h2>Medication Reminder 💊</h2>
-          <p>Dear <strong>${p.patientName}</strong>,</p>
+          <p>Dear <strong>${escHtml(p.patientName)}</strong>,</p>
           <p>Time to take your medication:</p>
           <ul>
-            <li><strong>Drug:</strong> ${p.drug}</li>
-            <li><strong>Dosage:</strong> ${p.dosage}</li>
-            <li><strong>Frequency:</strong> ${p.frequency}</li>
+            <li><strong>Drug:</strong> ${escHtml(p.drug || p.medication)}</li>
+            <li><strong>Dosage:</strong> ${escHtml(p.dosage)}</li>
+            <li><strong>Instructions:</strong> ${escHtml(p.instructions || p.frequency)}</li>
           </ul>
         `,
       });

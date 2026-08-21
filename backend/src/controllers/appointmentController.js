@@ -1,63 +1,10 @@
 const prisma = require('../utils/prismaClient');
 const { enqueueNotification } = require('../jobs/notificationQueue');
-const { callLLM } = require('../services/llm/llmService');
-const { preVisitSchema, postVisitSchema } = require('../services/llm/schemas');
+const { runPreVisitLLM, runPostVisitLLM } = require('../services/appointmentLLMService');
 const { parseFrequencyToOccurrences } = require('../services/medication');
+const { APPOINTMENT_STATUS, ROLE, HOLD_EXPIRES_MINUTES, NOTIFICATION_CHANNEL, NOTIFICATION_TYPE } = require('../lib/constants');
+const { addMinutes } = require('../lib/dateUtils');
 const logger = require('../utils/logger');
-
-// ─── Pre-Visit AI Analysis Helper ─────────────────────────────────────────────
-async function runPreVisitLLM(appointmentId, symptoms) {
-  const prompt = `Analyse these symptoms and return a JSON with these exact keys:
-{
-  "urgency": "Low" | "Medium" | "High",
-  "chiefComplaint": "string",
-  "suggestedQuestions": ["string", "string", "string"]
-}
-Symptoms: ${symptoms}`;
-
-  const result = await callLLM(prompt, preVisitSchema);
-
-  const fallbackSummary = {
-    urgency: 'Medium',
-    chiefComplaint: symptoms.length > 100 ? `${symptoms.slice(0, 100)}...` : symptoms,
-    suggestedQuestions: [
-      'How long have these symptoms persisted?',
-      'Are the symptoms getting progressively worse or intermittent?',
-      'Are you experiencing any other related symptoms?',
-    ],
-  };
-
-  await prisma.symptomForm.update({
-    where: { appointmentId },
-    data: {
-      aiSummary: result.status === 'ok' ? result.data : fallbackSummary,
-      aiStatus: result.status === 'ok' ? 'ok' : 'failed',
-    },
-  });
-
-  logger.info(`Pre-visit LLM for appointment ${appointmentId}: ${result.status}`);
-}
-
-// ─── Post-Visit AI Summary Helper ─────────────────────────────────────────────
-async function runPostVisitLLM(appointmentId, notes, prescription = []) {
-  const prompt = `Summarise these clinical notes for the patient in plain, easy-to-understand English.
-Return JSON:
-{
-  "summary": "plain English explanation",
-  "keyInstructions": ["instruction 1", "instruction 2"],
-  "redFlagWarnings": ["warning 1", "warning 2"]
-}
-Notes: ${notes}
-Prescriptions: ${JSON.stringify(prescription)}`;
-
-  const result = await callLLM(prompt, postVisitSchema);
-  if (result.status === 'ok') {
-    await prisma.visitNote.update({
-      where: { appointmentId },
-      data: { aiPatientSummary: result.data },
-    });
-  }
-}
 
 // ─── Controller Handlers ──────────────────────────────────────────────────────
 
@@ -69,8 +16,8 @@ exports.holdSlot = async (req, res) => {
   if (!doctor) return res.status(404).json({ error: 'Doctor not found' });
 
   const slotStartDate = new Date(slotStart);
-  const slotEndDate = new Date(slotStartDate.getTime() + doctor.slotDuration * 60 * 1000);
-  const holdExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5-minute hold
+  const slotEndDate = addMinutes(slotStartDate, doctor.slotDuration);
+  const holdExpiresAt = addMinutes(new Date(), HOLD_EXPIRES_MINUTES);
 
   try {
     const appointment = await prisma.$transaction(async (tx) => {
@@ -78,12 +25,12 @@ exports.holdSlot = async (req, res) => {
         where: {
           doctorId,
           slotStart: slotStartDate,
-          status: { in: ['held', 'confirmed'] },
+          status: { in: [APPOINTMENT_STATUS.HELD, APPOINTMENT_STATUS.CONFIRMED] },
         },
       });
 
       if (existing) {
-        if (existing.status === 'held' && existing.holdExpiresAt && existing.holdExpiresAt < new Date()) {
+        if (existing.status === APPOINTMENT_STATUS.HELD && existing.holdExpiresAt && existing.holdExpiresAt < new Date()) {
           await tx.appointment.delete({ where: { id: existing.id } });
         } else {
           const err = new Error('Slot already booked or held');
@@ -93,14 +40,7 @@ exports.holdSlot = async (req, res) => {
       }
 
       return tx.appointment.create({
-        data: {
-          doctorId,
-          patientId,
-          slotStart: slotStartDate,
-          slotEnd: slotEndDate,
-          status: 'held',
-          holdExpiresAt,
-        },
+        data: { doctorId, patientId, slotStart: slotStartDate, slotEnd: slotEndDate, status: APPOINTMENT_STATUS.HELD, holdExpiresAt },
       });
     });
 
@@ -110,7 +50,7 @@ exports.holdSlot = async (req, res) => {
       message: 'Slot held for 5 minutes. Submit symptoms to proceed.',
     });
   } catch (err) {
-    if (err.code === 'P2002' || (err.code && err.code === '23505') || err.status === 409) {
+    if (err.code === 'P2002' || err.code === '23505' || err.status === 409) {
       return res.status(409).json({ error: 'Slot no longer available' });
     }
     throw err;
@@ -125,10 +65,9 @@ exports.submitSymptoms = async (req, res) => {
   const appointment = await prisma.appointment.findUnique({ where: { id } });
   if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
   if (appointment.patientId !== patientId) return res.status(403).json({ error: 'Forbidden' });
-  if (appointment.status !== 'held') {
+  if (appointment.status !== APPOINTMENT_STATUS.HELD) {
     return res.status(400).json({ error: 'Appointment must be in held state' });
   }
-
   if (appointment.holdExpiresAt && new Date(appointment.holdExpiresAt) < new Date()) {
     return res.status(410).json({ error: 'Hold has expired. Please start again.' });
   }
@@ -143,17 +82,10 @@ exports.submitSymptoms = async (req, res) => {
 
   const updatedAppt = await prisma.appointment.findUnique({
     where: { id },
-    include: {
-      doctor: { include: { user: { select: { name: true } } } },
-      symptomForm: true,
-    },
+    include: { doctor: { include: { user: { select: { name: true } } } }, symptomForm: true },
   });
 
-  res.json({
-    appointment: updatedAppt,
-    message: 'Symptoms submitted. Proceeding to confirm.',
-    symptomFormId: form.id,
-  });
+  res.json({ appointment: updatedAppt, message: 'Symptoms submitted. Proceeding to confirm.', symptomFormId: form.id });
 };
 
 exports.confirmAppointment = async (req, res) => {
@@ -167,7 +99,7 @@ exports.confirmAppointment = async (req, res) => {
 
   if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
   if (appointment.patientId !== patientId) return res.status(403).json({ error: 'Forbidden' });
-  if (appointment.status !== 'held') {
+  if (appointment.status !== APPOINTMENT_STATUS.HELD) {
     return res.status(400).json({ error: 'Appointment is not in held state' });
   }
   if (appointment.holdExpiresAt && new Date(appointment.holdExpiresAt) < new Date()) {
@@ -176,7 +108,7 @@ exports.confirmAppointment = async (req, res) => {
 
   const confirmed = await prisma.appointment.update({
     where: { id },
-    data: { status: 'confirmed', holdExpiresAt: null },
+    data: { status: APPOINTMENT_STATUS.CONFIRMED, holdExpiresAt: null },
   });
 
   const payload = {
@@ -191,8 +123,8 @@ exports.confirmAppointment = async (req, res) => {
     slotEnd: appointment.slotEnd.toISOString(),
   };
 
-  await enqueueNotification({ type: 'booking_confirm', channel: 'email', payload, appointmentId: id });
-  await enqueueNotification({ type: 'booking_confirm', channel: 'calendar', payload, appointmentId: id });
+  await enqueueNotification({ type: NOTIFICATION_TYPE.BOOKING_CONFIRM, channel: NOTIFICATION_CHANNEL.EMAIL, payload, appointmentId: id });
+  await enqueueNotification({ type: NOTIFICATION_TYPE.BOOKING_CONFIRM, channel: NOTIFICATION_CHANNEL.CALENDAR, payload, appointmentId: id });
 
   res.json({ appointment: confirmed, message: 'Appointment confirmed!' });
 };
@@ -209,15 +141,15 @@ exports.cancelAppointment = async (req, res) => {
 
   if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
 
-  const isPatient = userRole === 'patient' && appointment.patientId === userId;
-  const isDoctor = userRole === 'doctor' && appointment.doctor.userId === userId;
-  const isAdmin = userRole === 'admin';
+  const isPatient = userRole === ROLE.PATIENT && appointment.patientId === userId;
+  const isDoctor = userRole === ROLE.DOCTOR && appointment.doctor.userId === userId;
+  const isAdmin = userRole === ROLE.ADMIN;
 
   if (!isPatient && !isDoctor && !isAdmin) return res.status(403).json({ error: 'Forbidden' });
 
   const cancelled = await prisma.appointment.update({
     where: { id },
-    data: { status: 'cancelled' },
+    data: { status: APPOINTMENT_STATUS.CANCELLED },
   });
 
   const payload = {
@@ -230,9 +162,9 @@ exports.cancelAppointment = async (req, res) => {
     googleEventId: appointment.calendarEvent?.googleEventId,
   };
 
-  await enqueueNotification({ type: 'cancellation', channel: 'email', payload, appointmentId: id });
+  await enqueueNotification({ type: NOTIFICATION_TYPE.CANCELLATION, channel: NOTIFICATION_CHANNEL.EMAIL, payload, appointmentId: id });
   if (appointment.calendarEvent?.googleEventId) {
-    await enqueueNotification({ type: 'cancellation', channel: 'calendar', payload, appointmentId: id });
+    await enqueueNotification({ type: NOTIFICATION_TYPE.CANCELLATION, channel: NOTIFICATION_CHANNEL.CALENDAR, payload, appointmentId: id });
   }
 
   res.json({ appointment: cancelled, message: 'Appointment cancelled' });
@@ -253,11 +185,11 @@ exports.rescheduleAppointment = async (req, res) => {
 
   const slotStartDate = new Date(slotStart);
   const doctor = await prisma.doctorProfile.findUnique({ where: { id: appointment.doctorId } });
-  const slotEndDate = new Date(slotStartDate.getTime() + doctor.slotDuration * 60 * 1000);
+  const slotEndDate = addMinutes(slotStartDate, doctor.slotDuration);
 
   const updated = await prisma.appointment.update({
     where: { id },
-    data: { slotStart: slotStartDate, slotEnd: slotEndDate, status: 'confirmed' },
+    data: { slotStart: slotStartDate, slotEnd: slotEndDate, status: APPOINTMENT_STATUS.CONFIRMED },
   });
 
   const payload = {
@@ -270,9 +202,9 @@ exports.rescheduleAppointment = async (req, res) => {
     googleEventId: appointment.calendarEvent?.googleEventId,
   };
 
-  await enqueueNotification({ type: 'booking_confirm', channel: 'email', payload, appointmentId: id });
+  await enqueueNotification({ type: NOTIFICATION_TYPE.BOOKING_CONFIRM, channel: NOTIFICATION_CHANNEL.EMAIL, payload, appointmentId: id });
   if (appointment.calendarEvent?.googleEventId) {
-    await enqueueNotification({ type: 'booking_confirm', channel: 'calendar', payload, appointmentId: id });
+    await enqueueNotification({ type: NOTIFICATION_TYPE.BOOKING_CONFIRM, channel: NOTIFICATION_CHANNEL.CALENDAR, payload, appointmentId: id });
   }
 
   res.json({ appointment: updated, message: 'Appointment rescheduled' });
@@ -283,8 +215,8 @@ exports.listAppointments = async (req, res) => {
   const { status } = req.query;
 
   const where = {};
-  if (role === 'patient') where.patientId = id;
-  if (role === 'doctor') {
+  if (role === ROLE.PATIENT) where.patientId = id;
+  if (role === ROLE.DOCTOR) {
     const doc = await prisma.doctorProfile.findUnique({ where: { userId: id } });
     if (!doc) return res.json([]);
     where.doctorId = doc.id;
@@ -321,13 +253,8 @@ exports.getAppointmentById = async (req, res) => {
   });
 
   if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
-
-  if (role === 'patient' && appointment.patientId !== userId) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  if (role === 'doctor' && appointment.doctor.userId !== userId) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
+  if (role === ROLE.PATIENT && appointment.patientId !== userId) return res.status(403).json({ error: 'Forbidden' });
+  if (role === ROLE.DOCTOR && appointment.doctor.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
 
   res.json(appointment);
 };
@@ -353,19 +280,17 @@ exports.submitVisitNotes = async (req, res) => {
 
   await prisma.appointment.update({
     where: { id },
-    data: { status: 'completed' },
+    data: { status: APPOINTMENT_STATUS.COMPLETED },
   });
 
-  // Trigger post-visit AI summary in background
   runPostVisitLLM(id, notes, prescription).catch((e) => logger.error('Post-visit LLM error', e));
 
-  // Schedule medication reminders
   for (const med of prescription) {
     const times = parseFrequencyToOccurrences(med.frequency, med.durationDays);
     for (const time of times) {
       await enqueueNotification({
-        type: 'med_reminder',
-        channel: 'email',
+        type: NOTIFICATION_TYPE.MED_REMINDER,
+        channel: NOTIFICATION_CHANNEL.EMAIL,
         payload: {
           patientName: appointment.patient.name,
           patientEmail: appointment.patient.email,

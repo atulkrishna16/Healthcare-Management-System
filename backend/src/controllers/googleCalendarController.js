@@ -17,9 +17,14 @@ exports.getConnectUrl = (req, res) => {
     });
   }
 
+  const stateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET || process.env.JWT_ACCESS_SECRET;
+  if (!stateSecret) {
+    return res.status(500).json({ error: 'Server authentication secret is not configured' });
+  }
+
   const state = jwt.sign(
     { userId: req.user.id, role: req.user.role },
-    process.env.JWT_ACCESS_SECRET || 'fallback_secret',
+    stateSecret,
     { expiresIn: '10m' }
   );
 
@@ -41,7 +46,8 @@ exports.oauthCallback = async (req, res) => {
   }
 
   try {
-    const decoded = jwt.verify(state, process.env.JWT_ACCESS_SECRET || 'fallback_secret');
+    const stateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET || process.env.JWT_ACCESS_SECRET;
+    const decoded = jwt.verify(state, stateSecret);
     const { tokens } = await oauth2Client.getToken(code);
 
     await prisma.user.update({

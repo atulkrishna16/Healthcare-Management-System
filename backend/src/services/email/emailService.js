@@ -1,3 +1,15 @@
+/**
+ * HTML-escape helper to prevent XSS when interpolating user data into email HTML.
+ */
+function escHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 const nodemailer = require('nodemailer');
 const logger = require('../../utils/logger');
 
@@ -8,7 +20,8 @@ function getTransporter() {
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false, // TLS
+      secure: false,
+      requireTLS: true, // L2: enforce STARTTLS — never send in plaintext
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -41,4 +54,4 @@ async function sendEmail({ to, subject, html, text }) {
   return info;
 }
 
-module.exports = { sendEmail };
+module.exports = { sendEmail, escHtml };

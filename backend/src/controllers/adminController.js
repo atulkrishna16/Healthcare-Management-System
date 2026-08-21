@@ -1,5 +1,6 @@
 const prisma = require('../utils/prismaClient');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { enqueueNotification, enqueueNotificationById } = require('../jobs/notificationQueue');
 const logger = require('../utils/logger');
 
@@ -21,7 +22,9 @@ exports.createDoctor = async (req, res) => {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return res.status(409).json({ error: 'Email already in use' });
 
-  const passwordHash = await bcrypt.hash('Doctor@1234', 12);
+  // Generate a secure random temporary password — emailed to doctor on creation
+  const tempPassword = crypto.randomBytes(12).toString('base64url'); // e.g. "aB3xQzR7mP2N"
+  const passwordHash = await bcrypt.hash(tempPassword, 12);
 
   const result = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
@@ -46,8 +49,19 @@ exports.createDoctor = async (req, res) => {
     return { user, profile };
   });
 
-  logger.info(`Admin created doctor: ${email}`);
-  res.status(201).json(result);
+  logger.info(`Admin created doctor: ${email} (temp password issued)`);
+  // Send temp password via email so the doctor can log in
+  try {
+    const { sendEmail } = require('../services/email/emailService');
+    await sendEmail({
+      to: email,
+      subject: 'Your Healthcare Manager Doctor Account',
+      html: `<h2>Welcome, ${name}!</h2><p>Your account has been created.</p><p><strong>Email:</strong> ${email}</p><p><strong>Temporary Password:</strong> <code>${tempPassword}</code></p><p>Please log in and change your password immediately.</p>`,
+    });
+  } catch (emailErr) {
+    logger.warn(`Could not send welcome email to ${email}: ${emailErr.message}`);
+  }
+  res.status(201).json({ ...result, tempPasswordIssued: true });
 };
 
 exports.updateDoctor = async (req, res) => {
@@ -185,21 +199,23 @@ exports.deleteDoctorLeave = async (req, res) => {
 };
 
 exports.listNotifications = async (req, res) => {
+  const MAX_LIMIT = 100;
   const { status = 'failed', page = 1, limit = 20 } = req.query;
-  const skip = (Number(page) - 1) * Number(limit);
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), MAX_LIMIT);
+  const skip = (Math.max(Number(page), 1) - 1) * safeLimit;
 
   const [notifications, total] = await Promise.all([
     prisma.notification.findMany({
       where: { status },
       orderBy: { updatedAt: 'desc' },
       skip,
-      take: Number(limit),
+      take: safeLimit,
       include: { appointment: { include: { patient: { select: { name: true, email: true } } } } },
     }),
     prisma.notification.count({ where: { status } }),
   ]);
 
-  res.json({ notifications, total, page: Number(page), limit: Number(limit) });
+  res.json({ notifications, total, page: Number(page), limit: safeLimit });
 };
 
 exports.retryNotification = async (req, res) => {

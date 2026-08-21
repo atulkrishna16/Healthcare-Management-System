@@ -28,7 +28,7 @@ router.post(
   '/:id/symptoms',
   authenticate,
   authorize('patient'),
-  [body('symptoms').trim().isLength({ min: 10 }).withMessage('Please describe your symptoms (min 10 chars)')],
+  [body('symptoms').trim().isLength({ min: 10, max: 2000 }).withMessage('Please describe your symptoms (10–2000 chars)')],
   validate,
   appointmentController.submitSymptoms
 );
@@ -72,7 +72,13 @@ router.post(
   '/:id/notes',
   authenticate,
   authorize('doctor'),
-  [body('notes').trim().notEmpty().withMessage('Clinical notes required')],
+  [
+    body('notes').trim().notEmpty().isLength({ max: 10000 }).withMessage('Clinical notes required'),
+    body('prescription').optional().isArray({ max: 20 }).withMessage('Max 20 prescriptions'),
+    body('prescription.*.medication').trim().isLength({ max: 200 }),
+    body('prescription.*.dosage').optional().trim().isLength({ max: 100 }),
+    body('prescription.*.frequency').optional().trim().isLength({ max: 100 }),
+  ],
   validate,
   appointmentController.submitVisitNotes
 );

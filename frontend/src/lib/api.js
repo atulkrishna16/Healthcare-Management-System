@@ -3,6 +3,7 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
   timeout: 30000,
+  withCredentials: true,
 });
 
 // ── Request interceptor: attach access token ───────────────────────────────
@@ -24,23 +25,21 @@ api.interceptors.response.use(
       original._retry = true;
       const refreshToken = localStorage.getItem('refreshToken');
 
-      if (refreshToken) {
-        try {
-          const res = await axios.post(
-            `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/auth/refresh`,
-            { refreshToken }
-          );
-          const { accessToken } = res.data;
+      try {
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/auth/refresh`,
+          refreshToken ? { refreshToken } : {},
+          { withCredentials: true }
+        );
+        const { accessToken } = res.data;
+        if (accessToken) {
           localStorage.setItem('accessToken', accessToken);
           original.headers.Authorization = `Bearer ${accessToken}`;
           return api(original);
-        } catch {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          window.location.href = '/login';
         }
-      } else {
+      } catch {
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
         window.location.href = '/login';
       }
     }
@@ -53,8 +52,10 @@ api.interceptors.response.use(
 export const authApi = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
-  refresh: (refreshToken) => api.post('/auth/refresh', { refreshToken }),
+  refresh: (refreshToken) => api.post('/auth/refresh', refreshToken ? { refreshToken } : {}),
+  logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
+  getGoogleAuthUrl: () => api.get('/auth/google'),
 };
 
 // ── Doctors ────────────────────────────────────────────────────────────────

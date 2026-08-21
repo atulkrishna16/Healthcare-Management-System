@@ -5,9 +5,17 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
+
+// ── Startup secret guards — crash loudly rather than silently use fallbacks ──
+['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'].forEach((key) => {
+  if (!process.env[key]) {
+    throw new Error(`FATAL: ${key} environment variable is not set. Refusing to start.`);
+  }
+});
 
 // ── Route Imports ─────────────────────────────────────────────────────────────
 const authRoutes = require('./routes/auth');
@@ -18,17 +26,18 @@ const googleCalendarRoutes = require('./routes/googleCalendar');
 
 const app = express();
 
-// Trust proxy for rate limiting behind reverse proxies/Vercel/Render/Fly
+// Trust proxy for rate limiting behind reverse proxies (Render, Vercel)
 app.set('trust proxy', 1);
 
 // ── Security & Parsing ────────────────────────────────────────────────────────
-app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(helmet()); // No overrides — keep all defaults including CORP
 
-// Flexible CORS for Vercel deployments, custom domains, and local dev
+// Strict CORS — only explicitly listed origins are allowed
 app.use(cors({
   origin: (origin, callback) => {
+    // Allow requests with no origin (curl, mobile apps, server-to-server)
     if (!origin) return callback(null, true);
-    
+
     const allowed = [
       process.env.FRONTEND_URL,
       'http://localhost:5173',
@@ -37,20 +46,23 @@ app.use(cors({
 
     if (
       allowed.includes(origin) ||
-      origin.endsWith('.vercel.app') ||
-      origin.includes('localhost')
+      origin.endsWith('.vercel.app')
     ) {
       return callback(null, true);
     }
-    return callback(null, true);
+
+    return callback(new Error(`CORS: origin "${origin}" is not allowed`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body size limits — prevent memory-exhaustion DoS
+app.use(express.json({ limit: '50kb' }));
+app.use(express.urlencoded({ extended: true, limit: '50kb' }));
+app.use(cookieParser());
+
 app.use(morgan('combined', {
   stream: { write: (msg) => logger.info(msg.trim()) },
 }));
