@@ -8,40 +8,63 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Clear legacy offline mocks
+    // Clear legacy storage items
     localStorage.removeItem('offlineUser');
+    localStorage.removeItem('refreshToken');
     
     const token = localStorage.getItem('accessToken');
     if (token && token !== 'mock-access-token') {
       authApi.me()
         .then((res) => setUser(res.data))
-        .catch(() => {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          setUser(null);
+        .catch(async () => {
+          // Access token might be expired — attempt silent cookie refresh
+          try {
+            const refreshRes = await authApi.refresh();
+            if (refreshRes.data?.accessToken) {
+              localStorage.setItem('accessToken', refreshRes.data.accessToken);
+              const meRes = await authApi.me();
+              setUser(meRes.data);
+            } else {
+              localStorage.removeItem('accessToken');
+              setUser(null);
+            }
+          } catch {
+            localStorage.removeItem('accessToken');
+            setUser(null);
+          }
         })
         .finally(() => setLoading(false));
     } else {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      setLoading(false);
+      // No access token — attempt silent cookie refresh (user returning to tab)
+      authApi.refresh()
+        .then(async (refreshRes) => {
+          if (refreshRes.data?.accessToken) {
+            localStorage.setItem('accessToken', refreshRes.data.accessToken);
+            const meRes = await authApi.me();
+            setUser(meRes.data);
+          } else {
+            setUser(null);
+          }
+        })
+        .catch(() => {
+          setUser(null);
+        })
+        .finally(() => setLoading(false));
     }
   }, []);
 
   const login = useCallback(async ({ email, password }) => {
     const res = await authApi.login({ email, password });
-    const { user, accessToken, refreshToken } = res.data;
+    const { user, accessToken } = res.data;
     localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
     setUser(user);
     return user;
   }, []);
 
   const register = useCallback(async ({ email, password, name }) => {
     const res = await authApi.register({ email, password, name });
-    const { user, accessToken, refreshToken } = res.data;
+    const { user, accessToken } = res.data;
     localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
     setUser(user);
     return user;
   }, []);
@@ -49,7 +72,6 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     authApi.logout().catch(() => {});
     localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
     localStorage.removeItem('offlineUser');
     setUser(null);
   }, []);

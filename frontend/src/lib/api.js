@@ -15,20 +15,24 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ── Response interceptor: handle 401, refresh token ───────────────────────
+// ── Response interceptor: handle 401, refresh token via httpOnly cookie ───
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
 
+    // Avoid infinite loop on auth endpoints
+    if (original.url?.includes('/auth/login') || original.url?.includes('/auth/refresh')) {
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
-      const refreshToken = localStorage.getItem('refreshToken');
 
       try {
         const res = await axios.post(
           `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/auth/refresh`,
-          refreshToken ? { refreshToken } : {},
+          {},
           { withCredentials: true }
         );
         const { accessToken } = res.data;
@@ -39,7 +43,6 @@ api.interceptors.response.use(
         }
       } catch {
         localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
         window.location.href = '/login';
       }
     }
@@ -52,7 +55,7 @@ api.interceptors.response.use(
 export const authApi = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
-  refresh: (refreshToken) => api.post('/auth/refresh', refreshToken ? { refreshToken } : {}),
+  refresh: () => api.post('/auth/refresh'),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   getGoogleAuthUrl: () => api.get('/auth/google'),
