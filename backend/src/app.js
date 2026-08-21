@@ -40,14 +40,14 @@ app.use(cors({
 
     const allowed = [
       process.env.FRONTEND_URL,
-      'http://localhost:5173',
-      'http://localhost:3000',
+      // Development fallbacks only — in production set FRONTEND_URL to your exact domain
+      ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:5173', 'http://localhost:3000'] : []),
     ].filter(Boolean);
 
-    if (
-      allowed.includes(origin) ||
-      origin.endsWith('.vercel.app')
-    ) {
+    // NOTE: Do NOT add a wildcard *.vercel.app match here —
+    // any attacker who deploys any project to Vercel would satisfy that check.
+    // Use FRONTEND_URL=https://your-app.vercel.app in your production env instead.
+    if (allowed.includes(origin)) {
       return callback(null, true);
     }
 

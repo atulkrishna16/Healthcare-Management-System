@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { appointmentsApi } from '../../lib/api';
@@ -14,16 +14,16 @@ import {
   AlertCircle,
   Pill,
   CheckCircle2,
-  Loader2,
 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import SimplePagination from '../../components/SimplePagination';
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 export default function MyAppointments() {
   const qc = useQueryClient();
   const [filterMode, setFilterMode] = useState('all'); // 'upcoming', 'past', 'all'
-  const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
-  const loadMoreSentinelRef = useRef(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments'],
@@ -32,44 +32,22 @@ export default function MyAppointments() {
 
   const cancelMutation = useMutation({
     mutationFn: (id) => appointmentsApi.cancel(id),
-    onSuccess: () => {
-      toast.success('Appointment cancelled');
+    onSuccess: (res) => {
+      toast.success(res.data?.message || 'Appointment cancelled. Slot is now available for other patients.');
       qc.invalidateQueries({ queryKey: ['appointments'] });
     },
     onError: (err) => toast.error(err.response?.data?.error || 'Cancellation failed'),
   });
 
   const upcoming = appointments.filter((a) => ['held', 'confirmed'].includes(a.status));
-  const past = appointments.filter((a) => ['completed', 'cancelled'].includes(a.status));
+  const past = appointments.filter((a) => ['completed', 'cancelled', 'doctor_leave_cancelled'].includes(a.status));
 
-  // Determine which list to display
   const targetList = filterMode === 'upcoming' ? upcoming : filterMode === 'past' ? past : appointments;
-  const visibleList = targetList.slice(0, visibleLimit);
-  const hasMore = visibleLimit < targetList.length;
-
-  useEffect(() => {
-    setVisibleLimit(PAGE_SIZE);
-  }, [filterMode]);
-
-  // Infinite Scroll / Lazy Loading Sentinel Observer
-  useEffect(() => {
-    if (!loadMoreSentinelRef.current || !hasMore) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleLimit((prev) => Math.min(prev + PAGE_SIZE, targetList.length));
-        }
-      },
-      { rootMargin: '100px' }
-    );
-
-    observer.observe(loadMoreSentinelRef.current);
-    return () => observer.disconnect();
-  }, [hasMore, targetList.length]);
+  const totalPages = Math.max(1, Math.ceil(targetList.length / PAGE_SIZE));
+  const paginatedList = targetList.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
-    <div className="space-y-8 max-w-5xl bg-[#F7F8F0] text-[#355872]">
+    <div className="space-y-8 w-full bg-[#F7F8F0] text-[#355872]">
       {/* Header */}
       <div className="pb-6 border-b border-[#7AAACE]/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -99,30 +77,40 @@ export default function MyAppointments() {
             { label: 'All Encounters', val: 'all', count: appointments.length },
             { label: 'Upcoming', val: 'upcoming', count: upcoming.length },
             { label: 'Past & Completed', val: 'past', count: past.length },
-          ].map(({ label, val, count }) => (
+          ].map((tab) => (
             <button
-              key={val}
-              type="button"
-              onClick={() => setFilterMode(val)}
+              key={tab.val}
+              onClick={() => {
+                setFilterMode(tab.val);
+                setCurrentPage(1);
+              }}
               className={`px-3 py-1.5 rounded-lg font-bold transition ${
-                filterMode === val
+                filterMode === tab.val
                   ? 'bg-[#355872] text-white shadow-sm'
                   : 'text-[#4A6478] hover:text-[#355872]'
               }`}
             >
-              {label} ({count})
+              {tab.label} ({tab.count})
             </button>
           ))}
         </div>
 
-        <span className="text-xs font-semibold text-[#4A6478]">
-          Showing {visibleList.length} of {targetList.length} records
+        <span className="text-xs text-[#4A6478] font-semibold">
+          Showing {paginatedList.length} of {targetList.length} records
         </span>
       </div>
 
       {isLoading ? (
-        <div className="p-12 text-center text-[#4A6478] bg-white border border-[#7AAACE]/60 rounded-2xl">
-          Loading appointment records...
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="p-5 rounded-2xl bg-white border border-[#7AAACE]/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-48 bg-[#7AAACE]/20" />
+                <Skeleton className="h-5 w-20 rounded-full bg-[#7AAACE]/20" />
+              </div>
+              <Skeleton className="h-3 w-36 bg-[#7AAACE]/20" />
+            </div>
+          ))}
         </div>
       ) : targetList.length === 0 ? (
         <div className="p-12 text-center text-[#4A6478] bg-white border border-[#7AAACE]/60 rounded-2xl space-y-3">
@@ -138,7 +126,7 @@ export default function MyAppointments() {
       ) : (
         <div className="space-y-4">
           <div className="space-y-3">
-            {visibleList.map((appt) => {
+            {paginatedList.map((appt) => {
               const isUpcoming = ['held', 'confirmed'].includes(appt.status);
               return (
                 <div
@@ -161,11 +149,11 @@ export default function MyAppointments() {
                             ? 'bg-[#9CD5FF] text-[#355872] border border-[#7AAACE]'
                             : appt.status === 'completed'
                             ? 'bg-[#9CD5FF]/40 text-[#355872] border border-[#7AAACE]'
-                            : appt.status === 'cancelled'
+                            : appt.status === 'cancelled' || appt.status === 'doctor_leave_cancelled'
                             ? 'bg-[#B5533C]/10 text-[#B5533C] border border-[#B5533C]/30'
                             : 'bg-[#F7F8F0] text-[#4A6478] border border-[#7AAACE]/50'
                         }`}>
-                          {appt.status}
+                          {appt.status === 'doctor_leave_cancelled' ? 'Doctor Leave' : appt.status}
                         </span>
                       </div>
                       <p className="text-xs text-[#4A6478] font-semibold">{appt.doctor?.specialisation}</p>
@@ -178,28 +166,33 @@ export default function MyAppointments() {
                     </div>
                     <div className="text-[#4A6478] flex items-center sm:justify-end gap-1.5 font-medium">
                       <Clock size={12} className="text-[#7AAACE]" />
-                      {dayjs(appt.slotStart).format('h:mm A')} – {dayjs(appt.slotEnd).format('h:mm A')}
+                      <span>
+                        {dayjs(appt.slotStart).format('h:mm A')} – {dayjs(appt.slotEnd).format('h:mm A')}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#7AAACE]/30 shrink-0">
+                  <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#7AAACE]/30">
                     <Link
                       to={`/patient/appointments/${appt.id}`}
-                      className="px-3.5 py-1.5 rounded-lg bg-[#355872] hover:bg-[#233B4D] text-xs font-bold text-white transition"
+                      className="px-3 py-1.5 rounded-xl bg-[#F7F8F0] hover:bg-[#EEF0E5] text-[#355872] border border-[#7AAACE]/60 text-xs font-bold transition flex items-center gap-1 active:scale-[0.97]"
                     >
-                      {appt.status === 'completed' ? 'Remarks' : 'View Details'}
+                      <FileText size={13} />
+                      <span>Details</span>
                     </Link>
+
                     {isUpcoming && (
                       <button
                         onClick={() => {
-                          if (confirm('Cancel this scheduled consultation?')) {
+                          if (confirm('Cancel this consultation? The slot will become available again for other patients.')) {
                             cancelMutation.mutate(appt.id);
                           }
                         }}
-                        className="p-1.5 rounded-lg text-[#4A6478] hover:text-[#B5533C] hover:bg-[#B5533C]/10 transition"
-                        title="Cancel Appointment"
+                        disabled={cancelMutation.isPending}
+                        className="px-3 py-1.5 rounded-xl bg-[#F7F8F0] hover:bg-[#B5533C]/10 text-[#B5533C] border border-[#B5533C]/30 text-xs font-bold transition flex items-center gap-1 active:scale-[0.97]"
                       >
-                        <XCircle size={17} />
+                        <XCircle size={13} />
+                        <span>Cancel</span>
                       </button>
                     )}
                   </div>
@@ -208,16 +201,7 @@ export default function MyAppointments() {
             })}
           </div>
 
-          {/* Lazy Loading Sentinel Element */}
-          {hasMore && (
-            <div
-              ref={loadMoreSentinelRef}
-              className="py-4 text-center text-xs text-[#4A6478] flex items-center justify-center gap-2 bg-white/60 rounded-xl border border-[#7AAACE]/40"
-            >
-              <Loader2 size={15} className="animate-spin text-[#355872]" />
-              <span>Loading more appointment history...</span>
-            </div>
-          )}
+          <SimplePagination page={currentPage} total={totalPages} onChange={setCurrentPage} />
         </div>
       )}
     </div>

@@ -34,6 +34,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import SimplePagination from '../../components/SimplePagination';
+
+const DOCTOR_PAGE_SIZE = 6;
 
 const DAYS = [
   { id: 1, name: 'Monday' },
@@ -103,6 +107,7 @@ export default function AdminDoctors() {
   const qc = useQueryClient();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [adminDoctorPage, setAdminDoctorPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [scheduleDoctor, setScheduleDoctor] = useState(null);
   const [scheduleMode, setScheduleMode] = useState('preset');
@@ -146,6 +151,12 @@ export default function AdminDoctors() {
         d.specialisation?.toLowerCase().includes(q)
     );
   }, [doctors, searchQuery]);
+
+  const totalDoctorPages = Math.max(1, Math.ceil(filteredDoctors.length / DOCTOR_PAGE_SIZE));
+  const paginatedDoctors = useMemo(() => {
+    const start = (adminDoctorPage - 1) * DOCTOR_PAGE_SIZE;
+    return filteredDoctors.slice(start, start + DOCTOR_PAGE_SIZE);
+  }, [filteredDoctors, adminDoctorPage]);
 
   const openScheduleModal = (doc) => {
     setScheduleDoctor(doc);
@@ -244,7 +255,7 @@ export default function AdminDoctors() {
   }, [selectedDayConfig, scheduleSlotDuration]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto bg-[#F7F8F0] text-[#355872]">
+    <div className="space-y-8 w-full bg-[#F7F8F0] text-[#355872]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-[#7AAACE]/40">
         <div>
@@ -295,11 +306,30 @@ export default function AdminDoctors() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-[#4A6478]">
-                  Loading physician registry...
-                </TableCell>
-              </TableRow>
+              [1, 2, 3, 4, 5].map((i) => (
+                <TableRow key={i} className="border-b border-[#7AAACE]/20">
+                  <TableCell className="pl-6 py-4">
+                    <Skeleton className="h-4 w-36 mb-1 bg-[#7AAACE]/20" />
+                    <Skeleton className="h-3 w-48 bg-[#7AAACE]/20" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-28 bg-[#7AAACE]/20" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-16 bg-[#7AAACE]/20" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-12 bg-[#7AAACE]/20" />
+                  </TableCell>
+                  <TableCell className="pr-6 text-right">
+                    <div className="flex justify-end gap-2">
+                      <Skeleton className="h-7 w-24 rounded-lg bg-[#7AAACE]/20" />
+                      <Skeleton className="h-7 w-16 rounded-lg bg-[#7AAACE]/20" />
+                      <Skeleton className="h-7 w-8 rounded-lg bg-[#7AAACE]/20" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
             ) : filteredDoctors.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-12 text-[#4A6478]">
@@ -307,7 +337,7 @@ export default function AdminDoctors() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredDoctors.map((doc) => (
+              paginatedDoctors.map((doc) => (
                 <TableRow key={doc.id} className="border-b border-[#7AAACE]/20 hover:bg-[#F7F8F0]/70 transition">
                   <TableCell className="pl-6 py-4">
                     <div className="font-bold text-[#355872] text-sm">{doc.user?.name}</div>
@@ -361,6 +391,8 @@ export default function AdminDoctors() {
             )}
           </TableBody>
         </Table>
+
+        <SimplePagination page={adminDoctorPage} total={totalDoctorPages} onChange={setAdminDoctorPage} />
       </div>
 
       {/* ── ADMIN DOCTOR SCHEDULE BUILDER MODAL ─────────────────────────────── */}

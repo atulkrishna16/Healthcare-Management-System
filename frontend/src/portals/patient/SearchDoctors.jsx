@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { doctorsApi } from '../../lib/api';
 import { Search, Stethoscope, Clock, ChevronRight, User, CalendarDays } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import SimplePagination from '../../components/SimplePagination';
 
 const SPECIALISATIONS = [
   'All',
@@ -15,10 +17,12 @@ const SPECIALISATIONS = [
 ];
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const PAGE_SIZE = 4;
 
 export default function SearchDoctors() {
   const [selectedSpec, setSelectedSpec] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data: doctors = [], isLoading } = useQuery({
     queryKey: ['doctors', selectedSpec],
@@ -28,16 +32,21 @@ export default function SearchDoctors() {
         .then((r) => r.data),
   });
 
-  const filtered = doctors.filter((doc) =>
-    searchQuery
-      ? doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.specialisation.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.email?.toLowerCase().includes(searchQuery.toLowerCase())
-      : true
-  );
+  const filtered = useMemo(() => {
+    return doctors.filter((doc) =>
+      searchQuery
+        ? doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          doc.specialisation.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          doc.email?.toLowerCase().includes(searchQuery.toLowerCase())
+        : true
+    );
+  }, [doctors, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedDoctors = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
-    <div className="space-y-8 max-w-5xl bg-[#F7F8F0] text-[#355872]">
+    <div className="space-y-8 w-full bg-[#F7F8F0] text-[#355872]">
       {/* Header */}
       <div className="pb-6 border-b border-[#7AAACE]/40 space-y-1">
         <div className="text-xs font-bold text-[#355872] uppercase tracking-wider">
@@ -59,7 +68,10 @@ export default function SearchDoctors() {
             type="text"
             placeholder="Search by physician name, specialty, or email..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-white border border-[#7AAACE] text-[#355872] placeholder-[#7AAACE] focus:outline-none focus:border-[#355872] focus:ring-2 focus:ring-[#9CD5FF] text-sm shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] font-medium"
           />
         </div>
@@ -69,7 +81,10 @@ export default function SearchDoctors() {
           {SPECIALISATIONS.map((spec) => (
             <button
               key={spec}
-              onClick={() => setSelectedSpec(spec)}
+              onClick={() => {
+                setSelectedSpec(spec);
+                setCurrentPage(1);
+              }}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
                 selectedSpec === spec
                   ? 'bg-[#355872] text-white shadow-[0_2px_8px_rgba(53,88,114,0.2)]'
@@ -82,10 +97,28 @@ export default function SearchDoctors() {
         </div>
       </div>
 
-      {/* Doctors Grid */}
+      {/* Doctors Grid with Skeletons on loading */}
       {isLoading ? (
-        <div className="p-12 text-center text-[#4A6478] bg-white border border-[#7AAACE]/60 rounded-2xl">
-          Loading provider registry...
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="p-6 rounded-2xl bg-white border border-[#7AAACE]/40 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-11 h-11 rounded-xl bg-[#7AAACE]/20" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32 bg-[#7AAACE]/20" />
+                    <Skeleton className="h-3 w-20 bg-[#7AAACE]/20" />
+                  </div>
+                </div>
+                <Skeleton className="h-5 w-16 rounded-full bg-[#7AAACE]/20" />
+              </div>
+              <Skeleton className="h-8 w-full rounded-xl bg-[#7AAACE]/20" />
+              <div className="flex items-center justify-between pt-2">
+                <Skeleton className="h-4 w-12 bg-[#7AAACE]/20" />
+                <Skeleton className="h-8 w-24 rounded-xl bg-[#7AAACE]/20" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="p-12 text-center text-[#4A6478] bg-white border border-[#7AAACE]/60 rounded-2xl space-y-2">
@@ -93,64 +126,68 @@ export default function SearchDoctors() {
           <p className="text-sm font-bold text-[#355872]">No physicians matched your search criteria.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {filtered.map((doc) => {
-            const activeDays = (doc.workingHours || [])
-              .map((h) => DAY_NAMES[h.dayOfWeek])
-              .join(', ');
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {paginatedDoctors.map((doc) => {
+              const activeDays = (doc.workingHours || [])
+                .map((h) => DAY_NAMES[h.dayOfWeek])
+                .join(', ');
 
-            return (
-              <div
-                key={doc.id}
-                className="p-6 rounded-2xl bg-white border border-[#7AAACE]/60 hover:border-[#355872] transition-all shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] flex flex-col justify-between space-y-5 border-l-4 border-l-[#7AAACE]"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-[#F7F8F0] border border-[#7AAACE]/60 text-[#355872] flex items-center justify-center font-bold">
-                        <User size={20} />
+              return (
+                <div
+                  key={doc.id}
+                  className="p-6 rounded-2xl bg-white border border-[#7AAACE]/60 hover:border-[#355872] transition-all shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] flex flex-col justify-between space-y-5 border-l-4 border-l-[#7AAACE]"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-[#F7F8F0] border border-[#7AAACE]/60 text-[#355872] flex items-center justify-center font-bold">
+                          <User size={20} />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-[#355872] text-base">{doc.name}</h3>
+                          <p className="text-xs font-semibold text-[#4A6478]">{doc.specialisation}</p>
+                          {doc.email && (
+                            <p className="text-[11px] text-[#7AAACE] font-medium">{doc.email}</p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-bold text-[#355872] text-base">{doc.name}</h3>
-                        <p className="text-xs font-semibold text-[#4A6478]">{doc.specialisation}</p>
-                        {doc.email && (
-                          <p className="text-[11px] text-[#7AAACE] font-medium">{doc.email}</p>
-                        )}
-                      </div>
+
+                      <span className="text-[10px] text-[#4A6478] font-bold px-2.5 py-1 rounded-full bg-[#F7F8F0] border border-[#7AAACE]/50 shrink-0">
+                        {doc.slotDuration}m slots
+                      </span>
                     </div>
 
-                    <span className="text-[10px] text-[#4A6478] font-bold px-2.5 py-1 rounded-full bg-[#F7F8F0] border border-[#7AAACE]/50 shrink-0">
-                      {doc.slotDuration}m slots
-                    </span>
+                    {activeDays && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-[#355872] font-semibold bg-[#F7F8F0] p-2 rounded-xl border border-[#7AAACE]/40">
+                        <CalendarDays size={13} className="text-[#355872]" />
+                        <span>Shifts: {activeDays}</span>
+                      </div>
+                    )}
+
+                    {doc.bio && (
+                      <p className="text-xs text-[#4A6478] line-clamp-2 leading-relaxed">
+                        {doc.bio}
+                      </p>
+                    )}
                   </div>
 
-                  {activeDays && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-[#355872] font-semibold bg-[#F7F8F0] p-2 rounded-xl border border-[#7AAACE]/40">
-                      <CalendarDays size={13} className="text-[#355872]" />
-                      <span>Shifts: {activeDays}</span>
-                    </div>
-                  )}
-
-                  {doc.bio && (
-                    <p className="text-xs text-[#4A6478] line-clamp-2 leading-relaxed">
-                      {doc.bio}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between pt-4 border-t border-[#7AAACE]/30 text-xs">
+                    <span className="text-[#4A6478] font-medium">{doc.timezone || 'EST'}</span>
+                    <Link
+                      to={`/patient/book/${doc.id}`}
+                      className="px-4 py-2 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-white font-bold text-xs transition active:scale-[0.97] flex items-center gap-1 shadow-[0_4px_12px_rgba(53,88,114,0.15)]"
+                    >
+                      Schedule Visit
+                      <ChevronRight size={14} />
+                    </Link>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-[#7AAACE]/30 text-xs">
-                  <span className="text-[#4A6478] font-medium">{doc.timezone || 'EST'}</span>
-                  <Link
-                    to={`/patient/book/${doc.id}`}
-                    className="px-4 py-2 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-white font-bold text-xs transition active:scale-[0.97] flex items-center gap-1 shadow-[0_4px_12px_rgba(53,88,114,0.15)]"
-                  >
-                    Schedule Visit
-                    <ChevronRight size={14} />
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
+          <SimplePagination page={currentPage} total={totalPages} onChange={setCurrentPage} />
         </div>
       )}
     </div>

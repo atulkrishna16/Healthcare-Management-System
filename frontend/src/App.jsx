@@ -38,7 +38,15 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ children }) {
+/**
+ * RequireRole — single route guard for the entire app.
+ * loading → null (suppress flash), not authed → /login, wrong role → own portal.
+ */
+function RequireRole({ role, children }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== role) return <Navigate to={`/${user.role}`} replace />;
   return children;
 }
 
@@ -62,19 +70,12 @@ export default function App() {
             {/* Root Landing Splash */}
             <Route path="/" element={<LandingPage />} />
 
-            {/* Auth */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+            {/* Auth — redirect away if already logged in */}
+            <Route path="/login" element={<RequireRole role={null}><LoginPage /></RequireRole>} />
+            <Route path="/register" element={<RequireRole role={null}><RegisterPage /></RequireRole>} />
 
-            {/* Patient Portal */}
-            <Route
-              path="/patient"
-              element={
-                <ProtectedRoute allowedRoles={['patient']}>
-                  <PatientLayout />
-                </ProtectedRoute>
-              }
-            >
+            {/* Patient Portal — patients only */}
+            <Route path="/patient" element={<RequireRole role="patient"><PatientLayout /></RequireRole>}>
               <Route index element={<PatientDashboard />} />
               <Route path="search" element={<SearchDoctors />} />
               <Route path="book/:doctorId" element={<BookAppointment />} />
@@ -82,28 +83,14 @@ export default function App() {
               <Route path="appointments/:id" element={<AppointmentDetail />} />
             </Route>
 
-            {/* Doctor Portal */}
-            <Route
-              path="/doctor"
-              element={
-                <ProtectedRoute allowedRoles={['doctor']}>
-                  <DoctorLayout />
-                </ProtectedRoute>
-              }
-            >
+            {/* Doctor Portal — doctors only */}
+            <Route path="/doctor" element={<RequireRole role="doctor"><DoctorLayout /></RequireRole>}>
               <Route index element={<DoctorDashboard />} />
               <Route path="appointments/:id" element={<DoctorAppointmentDetail />} />
             </Route>
 
-            {/* Admin Portal */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminLayout />
-                </ProtectedRoute>
-              }
-            >
+            {/* Admin Portal — admins only */}
+            <Route path="/admin" element={<RequireRole role="admin"><AdminLayout /></RequireRole>}>
               <Route index element={<AdminDashboard />} />
               <Route path="doctors" element={<AdminDoctors />} />
               <Route path="notifications" element={<AdminNotifications />} />

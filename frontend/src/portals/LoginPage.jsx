@@ -17,11 +17,19 @@ export default function LoginPage() {
   const [error, setError] = useState('');
 
   // Handle Google OAuth redirect callback
+  // Token is in the URL *fragment* (#), not the query string (?),
+  // so it is never sent to any server and never logged by proxies/CDNs.
   useEffect(() => {
-    const googleToken = searchParams.get('google_token');
+    const hash = window.location.hash;
+    const hashParams = new URLSearchParams(hash.replace('#', ''));
+    const googleToken = hashParams.get('google_token');
     const googleError = searchParams.get('google_error');
 
     if (googleToken) {
+      // Immediately clear the fragment from the URL so the token
+      // doesn't stay visible in the address bar or browser history.
+      window.history.replaceState(null, '', window.location.pathname);
+
       localStorage.setItem('accessToken', googleToken);
       authApi.me()
         .then((res) => {

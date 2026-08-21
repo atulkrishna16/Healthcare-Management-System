@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -127,8 +128,10 @@ export default function BookAppointment() {
     }
   };
 
+  const progressPercent = Math.round(((step + 1) / 3) * 100);
+
   return (
-    <div className="space-y-8 max-w-5xl bg-[#F7F8F0] text-[#355872]">
+    <div className="space-y-8 w-full bg-[#F7F8F0] text-[#355872]">
       {/* Breadcrumb Navigation */}
       <Breadcrumb>
         <BreadcrumbList>
@@ -179,6 +182,15 @@ export default function BookAppointment() {
         </Link>
       </div>
 
+      {/* Dynamic Intake Progress Bar */}
+      <div className="space-y-1.5 bg-white p-4 rounded-2xl border border-[#7AAACE]/50 shadow-2xs">
+        <div className="flex items-center justify-between text-xs font-bold text-[#355872]">
+          <span>Step {step + 1} of 3: {STEPS[step]}</span>
+          <span className="text-[#4A6478]">{progressPercent}% Completed</span>
+        </div>
+        <Progress value={progressPercent} className="h-2.5 bg-[#7AAACE]/20 [&>div]:bg-[#355872]" />
+      </div>
+
       {/* Stepper Progress Indicator */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {STEPS.map((s, idx) => (
@@ -223,9 +235,9 @@ export default function BookAppointment() {
 
       {/* STEP 0: Select Date & Time */}
       {step === 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Calendar Day Picker */}
-          <div className="lg:col-span-5 bg-white border border-[#7AAACE]/60 rounded-2xl p-6 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full">
+          {/* Calendar Day Picker (4 of 12 cols) */}
+          <div className="lg:col-span-4 bg-white border border-[#7AAACE]/60 rounded-2xl p-6 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] space-y-4">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <h3 className="text-xs font-bold text-[#355872] uppercase tracking-wider flex items-center gap-2">
                 <CalendarIcon size={14} className="text-[#355872]" />
@@ -286,8 +298,8 @@ export default function BookAppointment() {
             )}
           </div>
 
-          {/* Time Slot List */}
-          <div className="lg:col-span-7 space-y-4">
+          {/* Time Slot List (8 of 12 cols for generous horizontal space) */}
+          <div className="lg:col-span-8 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-[#355872] uppercase tracking-wider flex items-center gap-2">
                 <Clock size={14} className="text-[#355872]" />

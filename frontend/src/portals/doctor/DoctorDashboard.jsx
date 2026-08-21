@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { appointmentsApi } from '../../lib/api';
@@ -17,22 +17,22 @@ import {
   AlertTriangle,
   Stethoscope,
   ListFilter,
-  Loader2,
 } from 'lucide-react';
 import DoctorScheduleModal from './DoctorScheduleModal';
 import GoogleCalendarButton from '../../components/GoogleCalendarButton';
+import SimplePagination from '../../components/SimplePagination';
 import { Calendar } from '@/components/ui/calendar';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const URGENCY_WEIGHT = { High: 0, Medium: 1, Low: 2 };
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 export default function DoctorDashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showAll, setShowAll] = useState(false);
-  const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
   const [activePatient, setActivePatient] = useState(null);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
-  const loadMoreSentinelRef = useRef(null);
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['doctor-appointments'],
@@ -60,38 +60,21 @@ export default function DoctorDashboard() {
     });
   }, [confirmedAppts, showAll, selectedDate]);
 
-  const visibleAppts = sortedAppts.slice(0, visibleLimit);
-  const hasMore = visibleLimit < sortedAppts.length;
+  const totalPages = Math.max(1, Math.ceil(sortedAppts.length / PAGE_SIZE));
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const paginatedAppts = sortedAppts.slice(start, start + PAGE_SIZE);
 
-  // Reset limit when switching filter or date
+  // Reset to page 1 when switching filter or date
   useEffect(() => {
-    setVisibleLimit(PAGE_SIZE);
+    setCurrentPage(1);
   }, [showAll, selectedDate]);
-
-  // Infinite Scroll / Lazy Loading Sentinel Observer
-  useEffect(() => {
-    if (!showAll) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && visibleLimit < sortedAppts.length) {
-          setVisibleLimit((prev) => prev + PAGE_SIZE);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (loadMoreSentinelRef.current) {
-      observer.observe(loadMoreSentinelRef.current);
-    }
-    return () => observer.disconnect();
-  }, [showAll, visibleLimit, sortedAppts.length]);
 
   const getAppointmentCountForDate = (date) => {
     return confirmedAppts.filter((a) => dayjs(a.slotStart).isSame(dayjs(date), 'day')).length;
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 max-w-7xl mx-auto bg-[#F7F8F0] text-[#355872]">
+    <div className="space-y-8 w-full bg-[#F7F8F0] text-[#355872]">
       {/* Top Banner / Greeting */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-[#7AAACE]/40">
         <div>
@@ -128,7 +111,7 @@ export default function DoctorDashboard() {
       />
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
         <div className="bg-white border border-[#7AAACE]/60 rounded-2xl p-5 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
           <div className="text-2xl sm:text-3xl font-black text-[#355872] font-display">
             {confirmedAppts.filter((a) => dayjs(a.slotStart).isSame(dayjs(), 'day')).length}
@@ -167,17 +150,17 @@ export default function DoctorDashboard() {
       </div>
 
       {/* Main Dual-Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full">
         
-        {/* Left Column: Appointment Schedule List */}
-        <div className="lg:col-span-7 space-y-4">
+        {/* Left Column: Appointment Schedule List (Takes 8 of 12 columns for generous room) */}
+        <div className="lg:col-span-8 space-y-4">
           {/* List Header with Filter Switcher */}
           <div className="flex items-center justify-between pb-2 gap-2 flex-wrap">
             <div>
               <h2 className="text-base font-bold text-[#355872] tracking-tight flex items-center gap-2">
                 <span>{showAll ? 'All Scheduled Appointments' : `Roster for ${dayjs(selectedDate).format('MMMM D, YYYY')}`}</span>
                 <span className="text-xs font-semibold text-[#4A6478]">
-                  ({visibleAppts.length} of {sortedAppts.length})
+                  ({paginatedAppts.length} of {sortedAppts.length})
                 </span>
               </h2>
             </div>
@@ -211,8 +194,16 @@ export default function DoctorDashboard() {
           </div>
 
           {isLoading ? (
-            <div className="p-12 text-center text-[#4A6478] bg-white border border-[#7AAACE]/60 rounded-2xl">
-              Loading clinical data...
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="p-5 rounded-2xl bg-white border border-[#7AAACE]/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-5 w-40 bg-[#7AAACE]/20" />
+                    <Skeleton className="h-5 w-20 rounded-full bg-[#7AAACE]/20" />
+                  </div>
+                  <Skeleton className="h-3 w-56 bg-[#7AAACE]/20" />
+                </div>
+              ))}
             </div>
           ) : sortedAppts.length === 0 ? (
             <div className="p-12 text-center bg-white border border-[#7AAACE]/60 rounded-2xl text-[#4A6478] space-y-2">
@@ -221,86 +212,79 @@ export default function DoctorDashboard() {
               <p className="text-xs text-[#4A6478]">Select another calendar day or click "Show All".</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {visibleAppts.map((appt) => {
-                const urgency = appt.symptomForm?.aiSummary?.urgency;
-                return (
-                  <div
-                    key={appt.id}
-                    onClick={() => setActivePatient(appt)}
-                    className="p-5 rounded-2xl bg-white border border-[#7AAACE]/60 hover:border-[#355872] transition-all cursor-pointer shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] flex items-center justify-between gap-4 group border-l-4 border-l-[#7AAACE]"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
-                        <span className="text-base font-bold text-[#355872] group-hover:text-[#233B4D] transition-colors">
-                          {appt.patient?.name || 'Patient'}
-                        </span>
-                        
-                        {urgency === 'High' && (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#B5533C] text-white border border-[#B5533C] flex items-center gap-1">
-                            <AlertCircle size={11} /> High Urgency
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {paginatedAppts.map((appt) => {
+                  const urgency = appt.symptomForm?.aiSummary?.urgency;
+                  return (
+                    <div
+                      key={appt.id}
+                      onClick={() => setActivePatient(appt)}
+                      className="p-5 rounded-2xl bg-white border border-[#7AAACE]/60 hover:border-[#355872] transition-all cursor-pointer shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] flex items-center justify-between gap-4 group border-l-4 border-l-[#7AAACE]"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
+                          <span className="text-base font-bold text-[#355872] group-hover:text-[#233B4D] transition-colors">
+                            {appt.patient?.name || 'Patient'}
                           </span>
-                        )}
-                        {urgency === 'Medium' && (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#D9A24B] text-white border border-[#D9A24B]">
-                            Medium Urgency
+                          
+                          {urgency === 'High' && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#B5533C] text-white border border-[#B5533C] flex items-center gap-1">
+                              <AlertCircle size={11} /> High Urgency
+                            </span>
+                          )}
+                          {urgency === 'Medium' && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#D9A24B] text-white border border-[#D9A24B]">
+                              Medium Urgency
+                            </span>
+                          )}
+                          {urgency === 'Low' && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#9CD5FF] text-[#355872] border border-[#7AAACE]">
+                              Low Urgency
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3 text-xs text-[#4A6478] flex-wrap">
+                          {showAll && (
+                            <span className="font-bold text-[#355872] bg-[#F7F8F0] px-2 py-0.5 rounded-md border border-[#7AAACE]/50">
+                              {dayjs(appt.slotStart).format('MMM D, YYYY')}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 font-medium">
+                            <Clock size={13} className="text-[#7AAACE]" />
+                            {dayjs(appt.slotStart).format('h:mm A')} – {dayjs(appt.slotEnd).format('h:mm A')}
                           </span>
-                        )}
-                        {urgency === 'Low' && (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#9CD5FF] text-[#355872] border border-[#7AAACE]">
-                            Low Urgency
-                          </span>
-                        )}
+                          {appt.symptomForm?.aiSummary?.chiefComplaint && (
+                            <span className="text-[#4A6478] truncate hidden sm:inline">
+                              · {appt.symptomForm.aiSummary.chiefComplaint}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-3 text-xs text-[#4A6478] flex-wrap">
-                        {showAll && (
-                          <span className="font-bold text-[#355872] bg-[#F7F8F0] px-2 py-0.5 rounded-md border border-[#7AAACE]/50">
-                            {dayjs(appt.slotStart).format('MMM D, YYYY')}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1 font-medium">
-                          <Clock size={13} className="text-[#7AAACE]" />
-                          {dayjs(appt.slotStart).format('h:mm A')} – {dayjs(appt.slotEnd).format('h:mm A')}
-                        </span>
-                        {appt.symptomForm?.aiSummary?.chiefComplaint && (
-                          <span className="text-[#4A6478] truncate hidden sm:inline">
-                            · {appt.symptomForm.aiSummary.chiefComplaint}
-                          </span>
-                        )}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Link
+                          to={`/doctor/appointments/${appt.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="px-3.5 py-2 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-xs font-bold text-white transition active:scale-[0.97]"
+                        >
+                          Visit Notes
+                        </Link>
+                        <ChevronRight size={18} className="text-[#7AAACE] group-hover:text-[#355872] transition-colors" />
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
-                      <Link
-                        to={`/doctor/appointments/${appt.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="px-3.5 py-2 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-xs font-bold text-white transition active:scale-[0.97]"
-                      >
-                        Visit Notes
-                      </Link>
-                      <ChevronRight size={18} className="text-[#7AAACE] group-hover:text-[#355872] transition-colors" />
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Lazy Loading Sentinel Element */}
-              {hasMore && (
-                <div
-                  ref={loadMoreSentinelRef}
-                  className="py-4 text-center text-xs text-[#4A6478] flex items-center justify-center gap-2 bg-white/60 rounded-xl border border-[#7AAACE]/40"
-                >
-                  <Loader2 size={15} className="animate-spin text-[#355872]" />
-                  <span>Loading more appointments...</span>
-                </div>
-              )}
+              <SimplePagination page={currentPage} total={totalPages} onChange={setCurrentPage} />
             </div>
           )}
         </div>
 
-        {/* Right Column: Schedule Calendar */}
-        <div className="lg:col-span-5 bg-white border border-[#7AAACE]/60 rounded-2xl p-6 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] space-y-4">
+        {/* Right Column: Schedule Calendar (Docked neatly to the right) */}
+        <div className="lg:col-span-4 bg-white border border-[#7AAACE]/60 rounded-2xl p-6 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] space-y-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <h2 className="text-xs font-bold text-[#355872] uppercase tracking-wider flex items-center gap-2">
               <CalendarIcon size={15} className="text-[#355872]" />

@@ -18,7 +18,9 @@ const REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 const COOKIE_OPTS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
+  // 'lax' is required for OAuth redirect flows — 'strict' blocks the cookie from being
+  // sent on the redirect back from Google, breaking the auth flow.
+  sameSite: 'lax',
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
   path: '/',
 };
@@ -215,7 +217,10 @@ exports.googleAuthCallback = async (req, res) => {
     const appTokens = generateTokens(user);
     res.cookie('refreshToken', appTokens.refreshToken, COOKIE_OPTS);
 
-    res.redirect(`${FRONTEND_URL}/login?google_token=${appTokens.accessToken}&role=${user.role}`);
+    // Pass token via URL fragment (#) not query string — fragments are NOT sent to servers
+    // in HTTP requests and don't appear in server access logs or browser history entries
+    // at the server level, unlike query strings which are logged by every proxy/CDN.
+    res.redirect(`${FRONTEND_URL}/login#google_token=${appTokens.accessToken}&role=${user.role}`);
   } catch (err) {
     logger.error(`Google Auth Callback Error: ${err.message}`);
     res.redirect(`${FRONTEND_URL}/login?google_error=failed_to_link_google_account`);

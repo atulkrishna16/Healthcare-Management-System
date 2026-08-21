@@ -194,7 +194,17 @@ exports.rescheduleAppointment = async (req, res) => {
   if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
   if (appointment.patientId !== patientId) return res.status(403).json({ error: 'Forbidden' });
 
+  // Only confirmed appointments can be rescheduled
+  if (appointment.status !== APPOINTMENT_STATUS.CONFIRMED) {
+    return res.status(400).json({ error: 'Only confirmed appointments can be rescheduled' });
+  }
+
+  // Cannot reschedule to a slot in the past
   const slotStartDate = new Date(slotStart);
+  if (slotStartDate <= new Date()) {
+    return res.status(400).json({ error: 'Cannot reschedule to a past time slot' });
+  }
+
   const doctor = await prisma.doctorProfile.findUnique({ where: { id: appointment.doctorId } });
   const slotEndDate = addMinutes(slotStartDate, doctor.slotDuration);
 
@@ -224,6 +234,12 @@ exports.rescheduleAppointment = async (req, res) => {
 exports.listAppointments = async (req, res) => {
   const { role, id } = req.user;
   const { status } = req.query;
+
+  // Whitelist: prevent arbitrary Prisma where-clause injection via query param
+  const VALID_STATUSES = ['held', 'confirmed', 'completed', 'cancelled', 'doctor_leave_cancelled'];
+  if (status && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status filter' });
+  }
 
   const where = {};
   if (role === ROLE.PATIENT) where.patientId = id;

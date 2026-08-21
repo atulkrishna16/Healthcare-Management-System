@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   User,
 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PatientDashboard() {
   const { user } = useAuth();
@@ -34,7 +35,7 @@ export default function PatientDashboard() {
   const nextAppt = upcoming[0];
 
   return (
-    <div className="space-y-8 max-w-5xl bg-[#F7F8F0] text-[#355872]">
+    <div className="space-y-8 w-full bg-[#F7F8F0] text-[#355872]">
       {/* Welcome Banner — Solid Ink & Paper Card */}
       <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#7AAACE]/60 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] space-y-4">
         <div className="space-y-2">
@@ -63,13 +64,30 @@ export default function PatientDashboard() {
         </div>
       </div>
 
-      {/* Next Appointment Card */}
-      {nextAppt && (
+      {/* Next Appointment Card / Skeleton */}
+      {apptsLoading ? (
+        <div className="p-6 rounded-3xl bg-white border border-[#7AAACE]/60 space-y-4">
+          <div className="flex justify-between">
+            <Skeleton className="h-4 w-36 bg-[#7AAACE]/20" />
+            <Skeleton className="h-4 w-20 rounded-full bg-[#7AAACE]/20" />
+          </div>
+          <div className="p-4 rounded-2xl bg-[#F7F8F0] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-12 h-12 rounded-2xl bg-[#7AAACE]/20" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-40 bg-[#7AAACE]/20" />
+                <Skeleton className="h-3 w-28 bg-[#7AAACE]/20" />
+              </div>
+            </div>
+            <Skeleton className="h-8 w-28 bg-[#7AAACE]/20" />
+          </div>
+        </div>
+      ) : nextAppt && (
         <div className="p-6 rounded-3xl bg-white border border-[#7AAACE]/60 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] space-y-4 border-l-4 border-l-[#355872]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[#355872] flex items-center gap-2">
               <CalendarIcon size={15} className="text-[#7AAACE]" />
-              Upcoming Encounter
+              Upcoming
             </span>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#9CD5FF] text-[#355872] border border-[#7AAACE] uppercase">
               {nextAppt.status}
