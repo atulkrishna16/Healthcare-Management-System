@@ -44,6 +44,35 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /doctors/:id
+ * Public: get single doctor profile details
+ */
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  const doctor = await prisma.doctorProfile.findUnique({
+    where: { id },
+    include: {
+      user: { select: { name: true, email: true } },
+      workingHours: true,
+    },
+  });
+
+  if (!doctor) return res.status(404).json({ error: 'Doctor not found' });
+
+  res.json({
+    id: doctor.id,
+    name: doctor.user.name,
+    email: doctor.user.email,
+    specialisation: doctor.specialisation,
+    slotDuration: doctor.slotDuration,
+    timezone: doctor.timezone,
+    bio: doctor.bio,
+    workingHours: doctor.workingHours,
+  });
+});
+
+/**
  * GET /doctors/:id/slots?date=2024-01-15
  * Public: available slots on a given date
  */

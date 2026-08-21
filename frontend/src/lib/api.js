@@ -63,6 +63,7 @@ export const doctorsApi = {
     const query = typeof params === 'string' ? (params === 'All' ? {} : { specialisation: params }) : params;
     return api.get('/doctors', { params: query });
   },
+  get: (id) => api.get(`/doctors/${id}`),
   getSlots: (doctorId, date) => api.get(`/doctors/${doctorId}/slots`, { params: { date } }),
 };
 
