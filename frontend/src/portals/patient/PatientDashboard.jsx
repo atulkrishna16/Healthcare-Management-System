@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { appointmentsApi, doctorsApi } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
+import GoogleCalendarButton from '../../components/GoogleCalendarButton';
 import dayjs from 'dayjs';
 import {
   Calendar as CalendarIcon,
@@ -48,7 +49,7 @@ export default function PatientDashboard() {
             Schedule consultations with board-certified physicians, review clinical remarks, and track your active appointments.
           </p>
 
-          <div className="pt-2">
+          <div className="pt-2 flex items-center gap-3 flex-wrap">
             <Link
               to="/patient/search"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#355872] hover:bg-[#233B4D] active:scale-[0.98] text-white text-xs font-bold transition shadow-[0_4px_12px_rgba(53,88,114,0.15)]"
@@ -56,6 +57,8 @@ export default function PatientDashboard() {
               <Search size={15} />
               Find a Physician
             </Link>
+
+            <GoogleCalendarButton />
           </div>
         </div>
       </div>

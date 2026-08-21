@@ -64,11 +64,18 @@ app.get('/health', (req, res) => {
 // ── Global API Rate Limiter ───────────────────────────────────────────────────
 app.use(apiLimiter);
 
+const authRoutes = require('./routes/auth');
+const doctorRoutes = require('./routes/doctors');
+const appointmentRoutes = require('./routes/appointments');
+const adminRoutes = require('./routes/admin');
+const googleCalendarRoutes = require('./routes/googleCalendar');
+
 // ── Route Groups ──────────────────────────────────────────────────────────────
 app.use('/auth', authLimiter, authRoutes);
 app.use('/doctors', doctorRoutes);
 app.use('/appointments', appointmentRoutes);
 app.use('/admin', adminRoutes);
+app.use('/calendar/google', googleCalendarRoutes);
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((req, res) => {

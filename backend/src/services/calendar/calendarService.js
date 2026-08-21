@@ -1,15 +1,15 @@
 const { google } = require('googleapis');
 const logger = require('../../utils/logger');
 const fs = require('fs');
+const prisma = require('../../utils/prismaClient');
 
 let calendarClient;
 
-function getCalendar() {
+function getServiceAccountCalendar() {
   if (calendarClient) return calendarClient;
 
   let serviceAccount = null;
 
-  // 1. Direct JSON string from env var (e.g. on Render/Heroku)
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     try {
       serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
@@ -18,7 +18,6 @@ function getCalendar() {
     }
   }
 
-  // 2. File path on disk
   if (!serviceAccount && process.env.GOOGLE_SERVICE_ACCOUNT_PATH) {
     if (fs.existsSync(process.env.GOOGLE_SERVICE_ACCOUNT_PATH)) {
       try {
@@ -29,7 +28,6 @@ function getCalendar() {
     }
   }
 
-  // 3. Individual credentials
   if (!serviceAccount && process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
     serviceAccount = {
       client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -38,7 +36,6 @@ function getCalendar() {
   }
 
   if (!serviceAccount || !serviceAccount.client_email || !serviceAccount.private_key) {
-    logger.warn('Google service account not configured — calendar sync disabled');
     return null;
   }
 
@@ -52,19 +49,78 @@ function getCalendar() {
   return calendarClient;
 }
 
+/**
+ * Get authenticated Google Calendar client for a specific user via their OAuth2 token.
+ */
+async function getUserOAuthCalendar(userId) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      googleAccessToken: true,
+      googleRefreshToken: true,
+      isGoogleConnected: true,
+    },
+  });
+
+  if (!user || !user.isGoogleConnected || !user.googleRefreshToken) {
+    return null;
+  }
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/calendar/google/callback'
+  );
+
+  oauth2Client.setCredentials({
+    access_token: user.googleAccessToken,
+    refresh_token: user.googleRefreshToken,
+  });
+
+  return google.calendar({ version: 'v3', auth: oauth2Client });
+}
+
 const CALENDAR_ID = () => process.env.GOOGLE_CALENDAR_ID || 'primary';
 
 /**
- * Create a Google Calendar event.
+ * Create a Google Calendar event on user's personal calendar (via OAuth2)
+ * or clinic calendar (via Service Account).
  */
-async function createCalendarEvent({ summary, description, start, end, attendees = [] }) {
-  const calendar = getCalendar();
-  if (!calendar) return null;
+async function createCalendarEvent({ userId, summary, description, start, end, attendees = [] }) {
+  // 1. Try user's personal OAuth2 Calendar first
+  if (userId) {
+    const userCal = await getUserOAuthCalendar(userId);
+    if (userCal) {
+      try {
+        const response = await userCal.events.insert({
+          calendarId: 'primary',
+          requestBody: {
+            summary,
+            description,
+            start: { dateTime: new Date(start).toISOString(), timeZone: 'UTC' },
+            end: { dateTime: new Date(end).toISOString(), timeZone: 'UTC' },
+            reminders: {
+              useDefault: false,
+              overrides: [{ method: 'email', minutes: 24 * 60 }, { method: 'popup', minutes: 30 }],
+            },
+          },
+        });
+        logger.info(`OAuth2 Calendar event created on user's primary calendar: ${response.data.id}`);
+        return response.data;
+      } catch (err) {
+        logger.error(`OAuth2 event creation failed for user ${userId}:`, err.message);
+      }
+    }
+  }
+
+  // 2. Fallback to Service Account calendar
+  const serviceCal = getServiceAccountCalendar();
+  if (!serviceCal) return null;
 
   try {
-    const response = await calendar.events.insert({
+    const response = await serviceCal.events.insert({
       calendarId: CALENDAR_ID(),
-      sendUpdates: 'all', // Dispatches Google Calendar invite email to attendees automatically
+      sendUpdates: 'all',
       requestBody: {
         summary,
         description,
@@ -78,10 +134,10 @@ async function createCalendarEvent({ summary, description, start, end, attendees
       },
     });
 
-    logger.info(`Calendar event created: ${response.data.id}`);
+    logger.info(`Service account calendar event created: ${response.data.id}`);
     return response.data;
   } catch (err) {
-    logger.error('Failed to create Google Calendar event', err.message);
+    logger.error('Failed to create Service Account calendar event', err.message);
     return null;
   }
 }
@@ -89,12 +145,33 @@ async function createCalendarEvent({ summary, description, start, end, attendees
 /**
  * Update an existing Google Calendar event.
  */
-async function patchCalendarEvent(eventId, { summary, description, start, end, attendees }) {
-  const calendar = getCalendar();
-  if (!calendar || !eventId) return null;
+async function patchCalendarEvent(eventId, { userId, summary, description, start, end, attendees }) {
+  if (userId) {
+    const userCal = await getUserOAuthCalendar(userId);
+    if (userCal && eventId) {
+      try {
+        const response = await userCal.events.patch({
+          calendarId: 'primary',
+          eventId,
+          requestBody: {
+            ...(summary && { summary }),
+            ...(description && { description }),
+            ...(start && { start: { dateTime: new Date(start).toISOString(), timeZone: 'UTC' } }),
+            ...(end && { end: { dateTime: new Date(end).toISOString(), timeZone: 'UTC' } }),
+          },
+        });
+        return response.data;
+      } catch (e) {
+        logger.error(`Failed to patch OAuth2 event ${eventId}:`, e.message);
+      }
+    }
+  }
+
+  const serviceCal = getServiceAccountCalendar();
+  if (!serviceCal || !eventId) return null;
 
   try {
-    const response = await calendar.events.patch({
+    const response = await serviceCal.events.patch({
       calendarId: CALENDAR_ID(),
       eventId,
       sendUpdates: 'all',
@@ -107,10 +184,9 @@ async function patchCalendarEvent(eventId, { summary, description, start, end, a
       },
     });
 
-    logger.info(`Calendar event updated: ${eventId}`);
     return response.data;
   } catch (err) {
-    logger.error(`Failed to patch calendar event ${eventId}`, err.message);
+    logger.error(`Failed to patch Service Account calendar event ${eventId}`, err.message);
     return null;
   }
 }
@@ -118,21 +194,36 @@ async function patchCalendarEvent(eventId, { summary, description, start, end, a
 /**
  * Delete a Google Calendar event.
  */
-async function deleteCalendarEvent(eventId) {
-  const calendar = getCalendar();
-  if (!calendar || !eventId) return;
+async function deleteCalendarEvent(eventId, userId) {
+  if (userId) {
+    const userCal = await getUserOAuthCalendar(userId);
+    if (userCal && eventId) {
+      try {
+        await userCal.events.delete({ calendarId: 'primary', eventId });
+        return;
+      } catch (e) {
+        logger.error(`Failed to delete OAuth2 event ${eventId}:`, e.message);
+      }
+    }
+  }
+
+  const serviceCal = getServiceAccountCalendar();
+  if (!serviceCal || !eventId) return;
 
   try {
-    await calendar.events.delete({
+    await serviceCal.events.delete({
       calendarId: CALENDAR_ID(),
       eventId,
       sendUpdates: 'all',
     });
-
-    logger.info(`Calendar event deleted: ${eventId}`);
   } catch (err) {
-    logger.error(`Failed to delete calendar event ${eventId}`, err.message);
+    logger.error(`Failed to delete Service Account calendar event ${eventId}`, err.message);
   }
 }
 
-module.exports = { createCalendarEvent, patchCalendarEvent, deleteCalendarEvent };
+module.exports = {
+  createCalendarEvent,
+  patchCalendarEvent,
+  deleteCalendarEvent,
+  getUserOAuthCalendar,
+};

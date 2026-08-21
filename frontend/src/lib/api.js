@@ -83,6 +83,13 @@ export const appointmentsApi = {
   submitNotes: (id, data) => api.post(`/appointments/${id}/notes`, data),
 };
 
+// ── Google Calendar OAuth2 ────────────────────────────────────────────────
+export const googleCalendarApi = {
+  getConnectUrl: () => api.get('/calendar/google/connect'),
+  getStatus: () => api.get('/calendar/google/status'),
+  disconnect: () => api.post('/calendar/google/disconnect'),
+};
+
 // ── Admin ──────────────────────────────────────────────────────────────────
 export const adminApi = {
   stats: () => api.get('/admin/stats'),

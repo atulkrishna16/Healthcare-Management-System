@@ -20,6 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import DoctorScheduleModal from './DoctorScheduleModal';
+import GoogleCalendarButton from '../../components/GoogleCalendarButton';
 import { Calendar } from '@/components/ui/calendar';
 
 const URGENCY_WEIGHT = { High: 0, Medium: 1, Low: 2 };
@@ -106,7 +107,8 @@ export default function DoctorDashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <GoogleCalendarButton />
           <button
             onClick={() => setIsScheduleOpen(true)}
             className="px-4 py-2.5 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-white text-xs font-bold transition flex items-center gap-2 shadow-sm active:scale-[0.98]"
