@@ -22,13 +22,12 @@ router.post(
 );
 
 /**
- * Patient: Submit pre-consultation symptoms
+ * Patient: Submit pre-consultation symptoms (Non-blocking AI triage with automatic raw fallback)
  */
 router.post(
   '/:id/symptoms',
   authenticate,
   authorize('patient'),
-  aiLimiter,
   [body('symptoms').trim().isLength({ min: 10 }).withMessage('Please describe your symptoms (min 10 chars)')],
   validate,
   appointmentController.submitSymptoms
