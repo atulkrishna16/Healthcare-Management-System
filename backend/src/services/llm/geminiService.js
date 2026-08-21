@@ -20,15 +20,14 @@ function getGenAI() {
 async function callGemini(prompt) {
   const ai = getGenAI();
   const model = ai.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.6-flash',
     generationConfig: {
       responseMimeType: 'application/json',
     },
   });
 
   const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  return text;
+  return result.response.text();
 }
 
 module.exports = { callGemini };
