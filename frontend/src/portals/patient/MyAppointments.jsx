@@ -154,7 +154,7 @@ export default function MyAppointments() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-bold text-[#355872] text-sm">
-                          Dr. {appt.doctor?.user?.name}
+                          {appt.doctor?.user?.name?.startsWith('Dr.') ? appt.doctor?.user?.name : `Dr. ${appt.doctor?.user?.name || 'Physician'}`}
                         </h3>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                           appt.status === 'confirmed'
@@ -187,7 +187,7 @@ export default function MyAppointments() {
                       to={`/patient/appointments/${appt.id}`}
                       className="px-3.5 py-1.5 rounded-lg bg-[#355872] hover:bg-[#233B4D] text-xs font-bold text-white transition"
                     >
-                      {appt.status === 'completed' ? 'Care Plan & Rx' : 'View Details'}
+                      {appt.status === 'completed' ? 'Remarks' : 'View Details'}
                     </Link>
                     {isUpcoming && (
                       <button

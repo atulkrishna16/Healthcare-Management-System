@@ -45,7 +45,7 @@ export default function PatientDashboard() {
             Welcome, {user?.name || 'Patient'}
           </h1>
           <p className="text-xs sm:text-sm text-[#4A6478] max-w-xl leading-relaxed">
-            Schedule consultations with board-certified physicians, review AI-synthesized care plans, and track your active medication regimens.
+            Schedule consultations with board-certified physicians, review clinical remarks, and track your active appointments.
           </p>
 
           <div className="pt-2">

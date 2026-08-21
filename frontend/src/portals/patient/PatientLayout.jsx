@@ -80,7 +80,7 @@ export default function PatientLayout() {
               }
             >
               <CalendarIcon size={17} />
-              <span>My Visits & Care Plans</span>
+              <span>My Appointments</span>
             </NavLink>
           </nav>
         </div>

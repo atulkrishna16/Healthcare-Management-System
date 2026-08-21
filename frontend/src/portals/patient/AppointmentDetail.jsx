@@ -148,14 +148,14 @@ export default function AppointmentDetail() {
           <div className="p-6 rounded-3xl bg-white border border-[#7AAACE]/60 space-y-3 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
             <h3 className="text-xs font-bold text-[#355872] uppercase tracking-wider flex items-center gap-2">
               <FileText size={15} className="text-[#355872]" />
-              Doctor's Clinical Notes & Care Plan
+              Doctor's Remarks
             </h3>
             <p className="text-xs sm:text-sm text-[#355872] leading-relaxed p-4 rounded-xl bg-[#F7F8F0] border border-[#7AAACE]/50 font-medium">
               {visitNote.notes}
             </p>
           </div>
 
-          {/* Electronic Prescription */}
+          {/* Prescribed Medications */}
           {visitNote.prescription?.length > 0 && (
             <div className="p-6 rounded-3xl bg-white border border-[#7AAACE]/60 space-y-4 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
               <h3 className="text-xs font-bold text-[#355872] uppercase tracking-wider flex items-center gap-2">
@@ -184,7 +184,7 @@ export default function AppointmentDetail() {
       ) : (
         <div className="p-6 rounded-2xl bg-white border border-[#7AAACE]/60 text-xs text-[#4A6478] flex items-center gap-2 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.06)]">
           <AlertCircle size={15} className="text-[#7AAACE]" />
-          Visit notes and prescriptions will be published here after your consultation with Dr. {appt.doctor?.user?.name}.
+          Doctor's remarks and prescriptions will be published here after your consultation with {appt.doctor?.user?.name?.startsWith('Dr.') ? appt.doctor?.user?.name : `Dr. ${appt.doctor?.user?.name || 'Physician'}`}.
         </div>
       )}
     </div>
