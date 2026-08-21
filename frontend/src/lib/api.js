@@ -65,6 +65,10 @@ export const doctorsApi = {
   },
   get: (id) => api.get(`/doctors/${id}`),
   getSlots: (doctorId, date) => api.get(`/doctors/${doctorId}/slots`, { params: { date } }),
+  getOwnSchedule: () => api.get('/doctors/me/schedule'),
+  updateOwnSchedule: (data) => api.put('/doctors/me/schedule', data),
+  addOwnLeave: (data) => api.post('/doctors/me/leave', data),
+  deleteOwnLeave: (id) => api.delete(`/doctors/me/leave/${id}`),
 };
 
 // ── Appointments ───────────────────────────────────────────────────────────

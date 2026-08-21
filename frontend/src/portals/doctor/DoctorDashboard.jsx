@@ -19,6 +19,7 @@ import {
   ListFilter,
   Loader2,
 } from 'lucide-react';
+import DoctorScheduleModal from './DoctorScheduleModal';
 import { Calendar } from '@/components/ui/calendar';
 
 const URGENCY_WEIGHT = { High: 0, Medium: 1, Low: 2 };
@@ -29,6 +30,7 @@ export default function DoctorDashboard() {
   const [showAll, setShowAll] = useState(false);
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [activePatient, setActivePatient] = useState(null);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const loadMoreSentinelRef = useRef(null);
 
   const { data: appointments = [], isLoading } = useQuery({
@@ -67,20 +69,21 @@ export default function DoctorDashboard() {
 
   // Infinite Scroll / Lazy Loading Sentinel Observer
   useEffect(() => {
-    if (!loadMoreSentinelRef.current || !hasMore) return;
-
+    if (!showAll) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleLimit((prev) => Math.min(prev + PAGE_SIZE, sortedAppts.length));
+        if (entries[0].isIntersecting && visibleLimit < sortedAppts.length) {
+          setVisibleLimit((prev) => prev + PAGE_SIZE);
         }
       },
-      { rootMargin: '100px' }
+      { threshold: 0.1 }
     );
 
-    observer.observe(loadMoreSentinelRef.current);
+    if (loadMoreSentinelRef.current) {
+      observer.observe(loadMoreSentinelRef.current);
+    }
     return () => observer.disconnect();
-  }, [hasMore, sortedAppts.length]);
+  }, [showAll, visibleLimit, sortedAppts.length]);
 
   const getAppointmentCountForDate = (date) => {
     return confirmedAppts.filter((a) => dayjs(a.slotStart).isSame(dayjs(date), 'day')).length;
@@ -104,11 +107,23 @@ export default function DoctorDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="px-4 py-2 rounded-xl bg-white border border-[#7AAACE]/60 text-xs font-bold text-[#355872] shadow-[0_2px_6px_rgba(53,88,114,0.06)]">
+          <button
+            onClick={() => setIsScheduleOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-white text-xs font-bold transition flex items-center gap-2 shadow-sm active:scale-[0.98]"
+          >
+            <Clock size={14} />
+            Manage Availability
+          </button>
+          <div className="px-4 py-2.5 rounded-xl bg-white border border-[#7AAACE]/60 text-xs font-bold text-[#355872] shadow-[0_2px_6px_rgba(53,88,114,0.06)]">
             {confirmedAppts.length} Active Bookings
           </div>
         </div>
       </div>
+
+      <DoctorScheduleModal
+        isOpen={isScheduleOpen}
+        onClose={() => setIsScheduleOpen(false)}
+      />
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

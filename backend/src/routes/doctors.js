@@ -44,6 +44,134 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /doctors/me/schedule
+ * Doctor only: get own schedule & availability
+ */
+router.get('/me/schedule', authenticate, authorize('doctor'), async (req, res) => {
+  const doctor = await prisma.doctorProfile.findUnique({
+    where: { userId: req.user.id },
+    include: {
+      workingHours: { orderBy: { dayOfWeek: 'asc' } },
+      leaves: { orderBy: { date: 'asc' } },
+      user: { select: { name: true, email: true } },
+    },
+  });
+
+  if (!doctor) return res.status(404).json({ error: 'Doctor profile not found' });
+
+  res.json({
+    id: doctor.id,
+    name: doctor.user.name,
+    specialisation: doctor.specialisation,
+    slotDuration: doctor.slotDuration,
+    timezone: doctor.timezone,
+    workingHours: doctor.workingHours,
+    leaves: doctor.leaves,
+  });
+});
+
+/**
+ * PUT /doctors/me/schedule
+ * Doctor only: update own slot duration and working hours per day
+ */
+router.put('/me/schedule', authenticate, authorize('doctor'), async (req, res) => {
+  const { slotDuration, workingHours } = req.body;
+
+  const doctor = await prisma.doctorProfile.findUnique({
+    where: { userId: req.user.id },
+  });
+  if (!doctor) return res.status(404).json({ error: 'Doctor profile not found' });
+
+  // Update profile slot duration if provided
+  if (slotDuration) {
+    await prisma.doctorProfile.update({
+      where: { id: doctor.id },
+      data: { slotDuration: Number(slotDuration) },
+    });
+  }
+
+  // Update working hours
+  if (Array.isArray(workingHours)) {
+    // Delete existing working hours and replace with updated active days
+    await prisma.$transaction(async (tx) => {
+      await tx.doctorWorkingHours.deleteMany({
+        where: { doctorId: doctor.id },
+      });
+
+      const records = workingHours
+        .filter((wh) => wh.active !== false && wh.startTime && wh.endTime)
+        .map((wh) => ({
+          doctorId: doctor.id,
+          dayOfWeek: Number(wh.dayOfWeek),
+          startTime: wh.startTime,
+          endTime: wh.endTime,
+        }));
+
+      if (records.length > 0) {
+        await tx.doctorWorkingHours.createMany({
+          data: records,
+        });
+      }
+    });
+  }
+
+  const updated = await prisma.doctorProfile.findUnique({
+    where: { id: doctor.id },
+    include: {
+      workingHours: { orderBy: { dayOfWeek: 'asc' } },
+      leaves: { orderBy: { date: 'asc' } },
+    },
+  });
+
+  res.json({
+    message: 'Schedule and availability updated successfully',
+    doctor: updated,
+  });
+});
+
+/**
+ * POST /doctors/me/leave
+ * Doctor only: declare date unavailability / time off
+ */
+router.post('/me/leave', authenticate, authorize('doctor'), async (req, res) => {
+  const { date, reason } = req.body;
+  if (!date) return res.status(400).json({ error: 'Date is required' });
+
+  const doctor = await prisma.doctorProfile.findUnique({
+    where: { userId: req.user.id },
+  });
+  if (!doctor) return res.status(404).json({ error: 'Doctor profile not found' });
+
+  const leaveDate = dayjs(date).startOf('day').toDate();
+
+  const leave = await prisma.doctorLeave.upsert({
+    where: { doctorId_date: { doctorId: doctor.id, date: leaveDate } },
+    update: { reason },
+    create: { doctorId: doctor.id, date: leaveDate, reason },
+  });
+
+  res.status(201).json({ message: 'Leave recorded', leave });
+});
+
+/**
+ * DELETE /doctors/me/leave/:id
+ * Doctor only: cancel a declared leave
+ */
+router.delete('/me/leave/:id', authenticate, authorize('doctor'), async (req, res) => {
+  const { id } = req.params;
+  const doctor = await prisma.doctorProfile.findUnique({
+    where: { userId: req.user.id },
+  });
+  if (!doctor) return res.status(404).json({ error: 'Doctor profile not found' });
+
+  await prisma.doctorLeave.deleteMany({
+    where: { id, doctorId: doctor.id },
+  });
+
+  res.json({ message: 'Leave cancelled' });
+});
+
+/**
  * GET /doctors/:id
  * Public: get single doctor profile details
  */
