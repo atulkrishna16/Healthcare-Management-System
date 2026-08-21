@@ -473,20 +473,41 @@ export default function DoctorDashboard() {
             )}
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-between gap-3 pt-2">
               <button
-                onClick={() => setActivePatient(null)}
-                className="px-4 py-2.5 rounded-xl bg-[#F7F8F0] hover:bg-[#EEF0E5] border border-[#7AAACE]/60 text-xs font-bold text-[#355872] transition"
+                type="button"
+                onClick={async () => {
+                  if (confirm(`Cancel consultation with ${activePatient.patient?.name} and permanently remove this time slot?`)) {
+                    try {
+                      await appointmentsApi.cancel(activePatient.id);
+                      toast.success('Appointment cancelled and slot permanently removed.');
+                      setActivePatient(null);
+                    } catch (err) {
+                      toast.error(err.response?.data?.error || 'Failed to remove slot');
+                    }
+                  }
+                }}
+                className="px-4 py-2.5 rounded-xl bg-[#F7F8F0] hover:bg-[#B5533C]/10 text-[#B5533C] border border-[#B5533C]/40 text-xs font-bold transition flex items-center gap-1.5"
               >
-                Dismiss
+                <X size={14} />
+                Cancel & Remove Slot
               </button>
-              <Link
-                to={`/doctor/appointments/${activePatient.id}`}
-                className="px-5 py-2.5 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-xs font-bold text-white transition flex items-center gap-1.5 shadow-[0_4px_12px_rgba(53,88,114,0.15)]"
-              >
-                <FileText size={14} />
-                Open Visit Notes
-              </Link>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActivePatient(null)}
+                  className="px-4 py-2.5 rounded-xl bg-[#F7F8F0] hover:bg-[#EEF0E5] border border-[#7AAACE]/60 text-xs font-bold text-[#355872] transition"
+                >
+                  Dismiss
+                </button>
+                <Link
+                  to={`/doctor/appointments/${activePatient.id}`}
+                  className="px-5 py-2.5 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-xs font-bold text-white transition flex items-center gap-1.5 shadow-[0_4px_12px_rgba(53,88,114,0.15)]"
+                >
+                  <FileText size={14} />
+                  Open Visit Notes
+                </Link>
+              </div>
             </div>
 
           </div>

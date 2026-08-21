@@ -41,8 +41,11 @@ router.patch(
 router.delete('/doctors/:id', adminController.deleteDoctor);
 
 /**
- * Doctor Leave Management
+ * Doctor Leave & Schedule Management
  */
+router.get('/doctors/:id/schedule', adminController.getDoctorSchedule);
+router.put('/doctors/:id/schedule', adminController.updateDoctorSchedule);
+
 router.post(
   '/doctors/:id/leave',
   [

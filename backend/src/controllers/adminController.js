@@ -233,6 +233,70 @@ exports.retryNotification = async (req, res) => {
   res.json({ message: 'Notification re-queued' });
 };
 
+exports.getDoctorSchedule = async (req, res) => {
+  const { id } = req.params;
+  const doctor = await prisma.doctorProfile.findUnique({
+    where: { id },
+    include: {
+      user: { select: { name: true, email: true } },
+      workingHours: { orderBy: { dayOfWeek: 'asc' } },
+      leaves: { where: { date: { gte: new Date() } }, orderBy: { date: 'asc' } },
+    },
+  });
+
+  if (!doctor) return res.status(404).json({ error: 'Doctor not found' });
+  res.json({
+    id: doctor.id,
+    name: doctor.user.name,
+    email: doctor.user.email,
+    slotDuration: doctor.slotDuration,
+    workingHours: doctor.workingHours,
+    leaves: doctor.leaves,
+  });
+};
+
+exports.updateDoctorSchedule = async (req, res) => {
+  const { id } = req.params;
+  const { slotDuration, workingHours } = req.body;
+
+  const doctor = await prisma.doctorProfile.findUnique({ where: { id } });
+  if (!doctor) return res.status(404).json({ error: 'Doctor not found' });
+
+  await prisma.$transaction(async (tx) => {
+    if (slotDuration) {
+      await tx.doctorProfile.update({
+        where: { id },
+        data: { slotDuration: Number(slotDuration) },
+      });
+    }
+
+    if (Array.isArray(workingHours)) {
+      await tx.doctorWorkingHours.deleteMany({ where: { doctorId: id } });
+      if (workingHours.length > 0) {
+        await tx.doctorWorkingHours.createMany({
+          data: workingHours.map((wh) => ({
+            doctorId: id,
+            dayOfWeek: wh.dayOfWeek,
+            startTime: wh.startTime,
+            endTime: wh.endTime,
+          })),
+        });
+      }
+    }
+  });
+
+  const updated = await prisma.doctorProfile.findUnique({
+    where: { id },
+    include: { workingHours: true },
+  });
+
+  res.json({
+    message: 'Doctor schedule updated',
+    slotDuration: updated.slotDuration,
+    workingHours: updated.workingHours,
+  });
+};
+
 exports.getStats = async (req, res) => {
   const [totalDoctors, totalPatients, totalAppointments, failedNotifications] = await Promise.all([
     prisma.doctorProfile.count(),

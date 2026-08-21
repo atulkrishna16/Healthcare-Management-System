@@ -147,9 +147,13 @@ exports.cancelAppointment = async (req, res) => {
 
   if (!isPatient && !isDoctor && !isAdmin) return res.status(403).json({ error: 'Forbidden' });
 
+  // If doctor cancels -> DOCTOR_LEAVE_CANCELLED (slot permanently removed from availability)
+  // If patient cancels -> CANCELLED (slot becomes available again for other patients)
+  const newStatus = isDoctor ? APPOINTMENT_STATUS.DOCTOR_LEAVE_CANCELLED : APPOINTMENT_STATUS.CANCELLED;
+
   const cancelled = await prisma.appointment.update({
     where: { id },
-    data: { status: APPOINTMENT_STATUS.CANCELLED },
+    data: { status: newStatus },
   });
 
   const payload = {
@@ -160,6 +164,8 @@ exports.cancelAppointment = async (req, res) => {
     slotStart: appointment.slotStart.toISOString(),
     cancelledBy: userRole,
     googleEventId: appointment.calendarEvent?.googleEventId,
+    patientId: appointment.patientId,
+    doctorId: appointment.doctor.userId,
   };
 
   await enqueueNotification({ type: NOTIFICATION_TYPE.CANCELLATION, channel: NOTIFICATION_CHANNEL.EMAIL, payload, appointmentId: id });
@@ -167,7 +173,12 @@ exports.cancelAppointment = async (req, res) => {
     await enqueueNotification({ type: NOTIFICATION_TYPE.CANCELLATION, channel: NOTIFICATION_CHANNEL.CALENDAR, payload, appointmentId: id });
   }
 
-  res.json({ appointment: cancelled, message: 'Appointment cancelled' });
+  res.json({
+    appointment: cancelled,
+    message: isDoctor
+      ? 'Appointment cancelled and time slot permanently removed.'
+      : 'Appointment cancelled. Slot is now available for other patients.',
+  });
 };
 
 exports.rescheduleAppointment = async (req, res) => {

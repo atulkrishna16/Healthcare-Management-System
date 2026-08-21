@@ -174,6 +174,7 @@ async function handleCalendarNotification(notification) {
   switch (type) {
     case 'booking_confirm': {
       const result = await createCalendarEvent({
+        userId: p.patientId,
         summary: `Medical Appointment — ${p.doctorName}`,
         description: `Patient: ${p.patientName}\nDoctor: ${p.doctorName}`,
         start: p.slotStart,
@@ -197,7 +198,7 @@ async function handleCalendarNotification(notification) {
 
     case 'cancellation': {
       if (p.googleEventId) {
-        await deleteCalendarEvent(p.googleEventId);
+        await deleteCalendarEvent(p.googleEventId, p.patientId);
         await prisma.calendarEvent.updateMany({
           where: { appointmentId: appointmentId || p.appointmentId },
           data: { syncStatus: 'failed', lastError: 'Cancelled by user' },

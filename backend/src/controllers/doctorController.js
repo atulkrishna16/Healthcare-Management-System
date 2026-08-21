@@ -124,7 +124,7 @@ exports.getDoctorSlots = async (req, res) => {
     where: {
       doctorId: id,
       slotStart: { gte: startOfDay, lte: endOfDay },
-      status: { in: ['held', 'confirmed'] },
+      status: { in: ['held', 'confirmed', 'doctor_leave_cancelled'] },
     },
     select: { slotStart: true },
   });
