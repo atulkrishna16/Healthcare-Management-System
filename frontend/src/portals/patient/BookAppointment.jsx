@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { doctorsApi, appointmentsApi } from '../../lib/api';
@@ -17,6 +17,7 @@ import {
   Send,
   HelpCircle,
   FileText,
+  CalendarDays,
 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -30,6 +31,7 @@ import {
 } from '@/components/ui/breadcrumb';
 
 const STEPS = ['Select Date & Time', 'Describe Symptoms', 'Review & Confirm'];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function BookAppointment() {
   const { doctorId } = useParams();
@@ -57,6 +59,12 @@ export default function BookAppointment() {
   });
 
   const slots = Array.isArray(slotsData) ? slotsData : (slotsData?.slots || []);
+  const slotReason = slotsData?.reason;
+
+  const activeWorkingDaysSet = useMemo(() => {
+    if (!doctor?.workingHours) return new Set([1, 2, 3, 4, 5]);
+    return new Set(doctor.workingHours.map((h) => h.dayOfWeek));
+  }, [doctor]);
 
   const handleHoldSlot = async (slot) => {
     setSelectedSlot(slot);
@@ -224,7 +232,6 @@ export default function BookAppointment() {
                 1. Choose Date
               </h3>
 
-              {/* Direct Jump to Custom Date & Year */}
               <input
                 type="date"
                 min={dayjs().format('YYYY-MM-DD')}
@@ -253,6 +260,30 @@ export default function BookAppointment() {
                 className="bg-transparent border-0"
               />
             </div>
+
+            {/* Doctor Shift Legend */}
+            {doctor?.workingHours?.length > 0 && (
+              <div className="p-3 bg-[#F7F8F0] rounded-xl border border-[#7AAACE]/40 space-y-1 text-xs">
+                <div className="font-bold text-[#355872] flex items-center gap-1.5">
+                  <CalendarDays size={13} />
+                  <span>Physician Working Shifts:</span>
+                </div>
+                <div className="text-[11px] text-[#4A6478] flex flex-wrap gap-1.5 pt-1">
+                  {doctor.workingHours.map((h) => (
+                    <span
+                      key={h.id}
+                      className={`px-2 py-0.5 rounded-md border font-semibold ${
+                        dayjs(selectedDate).day() === h.dayOfWeek
+                          ? 'bg-[#355872] text-white border-[#355872]'
+                          : 'bg-white text-[#355872] border-[#7AAACE]/50'
+                      }`}
+                    >
+                      {DAY_NAMES[h.dayOfWeek]}: {h.startTime}–{h.endTime}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Time Slot List */}
@@ -260,7 +291,7 @@ export default function BookAppointment() {
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-[#355872] uppercase tracking-wider flex items-center gap-2">
                 <Clock size={14} className="text-[#355872]" />
-                2. Available Openings on {dayjs(selectedDate).format('MMMM D, YYYY')}
+                2. Available Openings on {dayjs(selectedDate).format('dddd, MMMM D, YYYY')}
               </h3>
               <span className="text-xs text-[#4A6478] font-semibold">
                 {slots.filter((s) => s.available !== false).length} slots open
@@ -272,34 +303,35 @@ export default function BookAppointment() {
                 Checking physician calendar...
               </div>
             ) : slots.length === 0 ? (
-              <div className="p-12 text-center text-[#4A6478] bg-white border border-[#7AAACE]/60 rounded-2xl space-y-2">
+              <div className="p-10 text-center text-[#4A6478] bg-white border border-[#7AAACE]/60 rounded-2xl space-y-3">
                 <AlertCircle size={32} className="mx-auto text-[#7AAACE] opacity-60" />
-                <p className="text-sm font-bold text-[#355872]">No open slots for this date.</p>
-                <p className="text-xs text-[#4A6478]">Please select another date on the calendar (Mon-Fri 9:00 AM - 5:00 PM).</p>
+                <p className="text-sm font-bold text-[#355872]">
+                  {slotReason || 'No open slots on this date.'}
+                </p>
+                <p className="text-xs text-[#4A6478] max-w-md mx-auto">
+                  {slotReason === 'Doctor not working on this day'
+                    ? `Dr. ${doctor?.name || 'Physician'} is off-duty on ${dayjs(selectedDate).format('dddd')}s. Please choose an active shift day from the calendar.`
+                    : 'All slots for this date may be booked or have passed. Please select another date.'}
+                </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {slots.map((slot, idx) => {
-                  const slotStart = slot.slotStart || slot.start;
-                  const isSelected = (selectedSlot?.slotStart || selectedSlot?.start) === slotStart;
-                  const isAvailable = slot.available !== false;
+                  const timeLabel = dayjs(slot.slotStart || slot.start).format('h:mm A');
+                  const endLabel = dayjs(slot.slotEnd || slot.end).format('h:mm A');
                   return (
                     <button
                       key={idx}
-                      disabled={!isAvailable || loading}
                       onClick={() => handleHoldSlot(slot)}
-                      className={`p-3.5 rounded-xl border text-xs font-bold transition-all active:scale-[0.97] flex flex-col items-center justify-center gap-1 shadow-sm ${
-                        isSelected
-                          ? 'bg-[#9CD5FF] border-[#355872] text-[#355872]'
-                          : isAvailable
-                          ? 'bg-white border-[#7AAACE] text-[#355872] hover:bg-[#9CD5FF]/30 hover:border-[#355872]'
-                          : 'bg-[#EEF0E5] border-[#7AAACE]/40 text-[#4A6478]/50 cursor-not-allowed opacity-60'
-                      }`}
+                      disabled={loading}
+                      className="p-3.5 rounded-2xl bg-white border border-[#7AAACE]/60 hover:border-[#355872] hover:bg-[#9CD5FF]/10 text-left transition-all shadow-[0_2px_8px_rgba(53,88,114,0.06)] active:scale-[0.98] group flex flex-col justify-between"
                     >
-                      <span className="text-sm">{dayjs(slotStart).format('h:mm A')}</span>
-                      <span className="text-[10px] font-semibold">
-                        {isAvailable ? 'Reserve Slot' : 'Unavailable'}
-                      </span>
+                      <div className="font-bold text-[#355872] text-sm group-hover:text-[#233B4D]">
+                        {timeLabel}
+                      </div>
+                      <div className="text-[10px] text-[#4A6478] font-semibold mt-1">
+                        to {endLabel}
+                      </div>
                     </button>
                   );
                 })}
@@ -311,106 +343,105 @@ export default function BookAppointment() {
 
       {/* STEP 1: Describe Symptoms */}
       {step === 1 && (
-        <form onSubmit={handleSymptomsSubmit} className="max-w-2xl bg-white border border-[#7AAACE]/60 rounded-2xl p-6 sm:p-8 space-y-6 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
+        <div className="bg-white border border-[#7AAACE]/60 rounded-3xl p-6 sm:p-8 space-y-6 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-[#355872]">Pre-Consultation Clinical Intake</h2>
+            <h2 className="text-xl font-extrabold text-[#355872] tracking-tight font-display flex items-center gap-2">
+              <Sparkles size={18} className="text-[#7AAACE]" />
+              Pre-Consultation Intake & Triage
+            </h2>
             <p className="text-xs text-[#4A6478]">
-              Describe your symptoms, onset, and relevant medical history for physician preparation.
+              Describe your symptoms and concerns. Our clinical AI will summarize this for Dr. {doctor?.name}.
             </p>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[#355872] uppercase tracking-wider block">
-              Describe your symptoms & chief complaint *
-            </label>
-            <textarea
-              rows={5}
-              value={symptoms}
-              onChange={(e) => setSymptoms(e.target.value)}
-              placeholder="e.g., Episodic chest tightness and rapid pulse following morning exercise for the past 10 days. No family history of heart disease."
-              className="w-full p-4 bg-[#F7F8F0] border border-[#7AAACE] rounded-xl text-sm text-[#355872] placeholder-[#7AAACE] focus:outline-none focus:border-[#355872] focus:ring-2 focus:ring-[#9CD5FF] transition"
-              required
-            />
-          </div>
+          <form onSubmit={handleSymptomsSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#355872] uppercase tracking-wider block">
+                Describe your symptoms (minimum 10 characters)
+              </label>
+              <textarea
+                rows={5}
+                value={symptoms}
+                onChange={(e) => setSymptoms(e.target.value)}
+                placeholder="E.g., Mild headache and slight fever starting 2 days ago after travelling..."
+                className="w-full p-4 bg-[#F7F8F0] border border-[#7AAACE] rounded-2xl text-sm text-[#355872] placeholder-[#7AAACE] focus:outline-none focus:ring-2 focus:ring-[#9CD5FF] font-medium resize-none"
+                required
+              />
+            </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-[#7AAACE]/40">
-            <button
-              type="button"
-              onClick={() => setStep(0)}
-              className="px-4 py-2.5 bg-[#F7F8F0] hover:bg-[#EEF0E5] border border-[#7AAACE] rounded-xl text-xs font-bold text-[#355872] transition"
-            >
-              Back to Calendar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2.5 bg-[#355872] hover:bg-[#233B4D] text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm active:scale-[0.98] disabled:opacity-50"
-            >
-              {loading ? 'Synthesizing with AI...' : 'Proceed to Review'}
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        </form>
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => setStep(0)}
+                className="px-5 py-2.5 rounded-xl border border-[#7AAACE] text-xs font-bold text-[#355872] hover:bg-[#EEF0E5] transition"
+              >
+                Back to Slots
+              </button>
+
+              <button
+                type="submit"
+                disabled={loading || symptoms.trim().length < 10}
+                className="px-6 py-2.5 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-white text-xs font-bold transition flex items-center gap-2 shadow-[0_4px_12px_rgba(53,88,114,0.15)] disabled:opacity-50 active:scale-[0.98]"
+              >
+                {loading ? 'Processing...' : 'Proceed to Review'}
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {/* STEP 2: Review & Confirm */}
-      {step === 2 && appointment && (
-        <div className="max-w-2xl bg-white border border-[#7AAACE]/60 rounded-2xl p-6 sm:p-8 space-y-6 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
+      {step === 2 && (
+        <div className="bg-white border border-[#7AAACE]/60 rounded-3xl p-6 sm:p-8 space-y-6 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-[#355872]">Review & Confirm Consultation</h2>
+            <h2 className="text-xl font-extrabold text-[#355872] tracking-tight font-display flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-[#355872]" />
+              Confirm Consultation Booking
+            </h2>
             <p className="text-xs text-[#4A6478]">
-              Verify your booking details and AI symptom summary before final scheduling.
+              Please review your appointment summary before confirming.
             </p>
           </div>
 
-          <div className="p-4 rounded-xl bg-[#F7F8F0] border border-[#7AAACE]/60 space-y-3">
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-[#4A6478] font-semibold">Physician:</span>
-              <span className="font-bold text-[#355872]">{doctor?.name}</span>
+          <div className="p-5 rounded-2xl bg-[#F7F8F0] border border-[#7AAACE]/50 space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-[#7AAACE]/30 pb-3">
+              <span className="text-[#4A6478] font-medium">Physician</span>
+              <span className="font-bold text-[#355872]">Dr. {doctor?.name} ({doctor?.specialisation})</span>
             </div>
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-[#4A6478] font-semibold">Specialisation:</span>
-              <span className="font-bold text-[#355872]">{doctor?.specialisation}</span>
-            </div>
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-[#4A6478] font-semibold">Date & Time:</span>
+
+            <div className="flex items-center justify-between border-b border-[#7AAACE]/30 pb-3">
+              <span className="text-[#4A6478] font-medium">Scheduled Time</span>
               <span className="font-bold text-[#355872]">
-                {dayjs(appointment.slotStart).format('dddd, MMMM D, YYYY · h:mm A')}
+                {dayjs(appointment?.slotStart).format('dddd, MMMM D, YYYY · h:mm A')}
               </span>
+            </div>
+
+            <div>
+              <span className="text-[#4A6478] font-medium block mb-1">Reported Symptoms</span>
+              <p className="font-semibold text-[#355872] bg-white p-3 rounded-xl border border-[#7AAACE]/40">
+                {symptoms}
+              </p>
             </div>
           </div>
 
-          {/* AI Intake Summary */}
-          {appointment.symptomForm?.aiSummary && (
-            <div className="p-4 rounded-xl bg-[#9CD5FF]/20 border border-[#7AAACE]/60 space-y-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-[#355872]">
-                <Sparkles size={14} className="text-[#355872]" />
-                <span>AI Clinical Triage Summary</span>
-              </div>
-              <p className="text-xs text-[#4A6478] leading-relaxed">
-                {typeof appointment.symptomForm.aiSummary === 'string'
-                  ? appointment.symptomForm.aiSummary
-                  : appointment.symptomForm.aiSummary.chiefComplaint || 'Symptom briefing prepared for physician.'}
-              </p>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between pt-4 border-t border-[#7AAACE]/40">
+          <div className="flex items-center justify-between pt-2">
             <button
               type="button"
               onClick={() => setStep(1)}
-              className="px-4 py-2.5 bg-[#F7F8F0] hover:bg-[#EEF0E5] border border-[#7AAACE] rounded-xl text-xs font-bold text-[#355872] transition"
+              className="px-5 py-2.5 rounded-xl border border-[#7AAACE] text-xs font-bold text-[#355872] hover:bg-[#EEF0E5] transition"
             >
-              Edit Symptoms
+              Back to Symptoms
             </button>
+
             <button
               type="button"
-              disabled={loading}
               onClick={handleConfirm}
-              className="px-6 py-2.5 bg-[#355872] hover:bg-[#233B4D] text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm active:scale-[0.98] disabled:opacity-50"
+              disabled={loading}
+              className="px-8 py-3 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-white text-xs font-bold transition flex items-center gap-2 shadow-[0_4px_12px_rgba(53,88,114,0.15)] active:scale-[0.98] disabled:opacity-50"
             >
               {loading ? 'Confirming...' : 'Confirm Appointment'}
-              <CheckCircle2 size={14} />
+              <CheckCircle2 size={16} />
             </button>
           </div>
         </div>
