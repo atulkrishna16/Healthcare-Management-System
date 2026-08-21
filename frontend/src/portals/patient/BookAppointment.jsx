@@ -67,7 +67,8 @@ export default function BookAppointment() {
         doctorId,
         slotStart,
       });
-      setAppointment(res.data.appointment || res.data);
+      const apptData = res.data.appointment || res.data;
+      setAppointment(apptData);
       setStep(1);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to hold slot. It may have just been booked.');
@@ -79,10 +80,12 @@ export default function BookAppointment() {
   const handleSymptomsSubmit = async (e) => {
     e.preventDefault();
     if (!symptoms.trim()) return toast.error('Please describe your symptoms');
+    if (!appointment?.id) return toast.error('Appointment session lost. Please select your slot again.');
     setLoading(true);
     try {
       const res = await appointmentsApi.submitSymptoms(appointment.id, { symptoms });
-      setAppointment(res.data.appointment || res.data);
+      const apptData = res.data.appointment || { ...appointment, symptomForm: { symptoms } };
+      setAppointment(apptData);
       setStep(2);
     } catch (err) {
       if (err.response?.status === 410) {

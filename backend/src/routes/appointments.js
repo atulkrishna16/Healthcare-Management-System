@@ -120,7 +120,19 @@ router.post(
     // ── Trigger pre-visit LLM asynchronously ──────────────────────────────
     runPreVisitLLM(id, symptoms).catch((e) => logger.error('Pre-visit LLM error', e));
 
-    res.json({ message: 'Symptoms submitted. Proceeding to confirm.', symptomFormId: form.id });
+    const updatedAppt = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        doctor: { include: { user: { select: { name: true } } } },
+        symptomForm: true,
+      },
+    });
+
+    res.json({
+      appointment: updatedAppt,
+      message: 'Symptoms submitted. Proceeding to confirm.',
+      symptomFormId: form.id,
+    });
   }
 );
 
