@@ -114,7 +114,7 @@ export default function DoctorDashboard() {
             className="px-4 py-2.5 rounded-xl bg-[#355872] hover:bg-[#233B4D] text-white text-xs font-bold transition flex items-center gap-2 shadow-sm active:scale-[0.98]"
           >
             <Clock size={14} />
-            Manage Availability
+            Manage & Create Slots
           </button>
           <div className="px-4 py-2.5 rounded-xl bg-white border border-[#7AAACE]/60 text-xs font-bold text-[#355872] shadow-[0_2px_6px_rgba(53,88,114,0.06)]">
             {confirmedAppts.length} Active Bookings

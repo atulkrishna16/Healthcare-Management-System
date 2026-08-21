@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { doctorsApi } from '../../lib/api';
 import toast from 'react-hot-toast';
@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Settings,
+  Sparkles,
+  CalendarDays,
 } from 'lucide-react';
 
 const DAYS = [
@@ -24,6 +26,22 @@ const DAYS = [
   { id: 6, name: 'Saturday' },
   { id: 0, name: 'Sunday' },
 ];
+
+function generatePreviewSlots(startTime, endTime, durationMinutes) {
+  if (!startTime || !endTime || !durationMinutes || durationMinutes <= 0) return [];
+  const [startH, startM] = startTime.split(':').map(Number);
+  const [endH, endM] = endTime.split(':').map(Number);
+
+  let current = dayjs().hour(startH).minute(startM).second(0);
+  const end = dayjs().hour(endH).minute(endM).second(0);
+
+  const slots = [];
+  while (current.add(durationMinutes, 'minute').isBefore(end) || current.add(durationMinutes, 'minute').isSame(end)) {
+    slots.push(current.format('h:mm A'));
+    current = current.add(durationMinutes, 'minute');
+  }
+  return slots;
+}
 
 export default function DoctorScheduleModal({ isOpen, onClose }) {
   const queryClient = useQueryClient();
@@ -39,6 +57,7 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
   const [leaveDate, setLeaveDate] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [previewDayId, setPreviewDayId] = useState(1);
 
   useEffect(() => {
     if (scheduleData) {
@@ -66,20 +85,36 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
     );
   };
 
+  const selectedDayConfig = workingDays.find((d) => d.dayOfWeek === previewDayId) || workingDays[0];
+  const previewSlots = useMemo(() => {
+    if (!selectedDayConfig || !selectedDayConfig.active) return [];
+    return generatePreviewSlots(selectedDayConfig.startTime, selectedDayConfig.endTime, Number(slotDuration));
+  }, [selectedDayConfig, slotDuration]);
+
   const handleSaveSchedule = async (e) => {
     e.preventDefault();
     setIsSaving(true);
+
+    const activeWorkingHours = workingDays
+      .filter((d) => d.active)
+      .map((d) => ({
+        dayOfWeek: d.dayOfWeek,
+        startTime: d.startTime,
+        endTime: d.endTime,
+      }));
+
     try {
       await doctorsApi.updateOwnSchedule({
         slotDuration: Number(slotDuration),
-        workingHours: workingDays,
+        workingHours: activeWorkingHours,
       });
-      toast.success('Consultation hours & slot availability saved!');
+
+      toast.success('Shift schedule & slots updated successfully!');
       queryClient.invalidateQueries(['doctor-own-schedule']);
       queryClient.invalidateQueries(['doctor-appointments']);
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save schedule');
+      toast.error(err.response?.data?.error || 'Failed to update schedule');
     } finally {
       setIsSaving(false);
     }
@@ -119,14 +154,14 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
         <div className="flex items-center justify-between pb-4 border-b border-[#7AAACE]/40">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#F7F8F0] border border-[#7AAACE] text-[#355872] flex items-center justify-center font-bold">
-              <Settings size={20} />
+              <CalendarDays size={20} />
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-extrabold text-[#355872] tracking-tight">
-                Manage Consultation Hours & Availability
+                Slot & Shift Schedule Builder
               </h2>
               <p className="text-xs text-[#4A6478]">
-                Customize your weekly shift times, slot intervals, and planned time off.
+                Set your custom working hours and slot duration — slots are generated automatically.
               </p>
             </div>
           </div>
@@ -146,10 +181,10 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
             {/* Slot Duration Selector */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-[#355872] uppercase tracking-wider block">
-                Appointment Slot Duration (Minutes)
+                Appointment Slot Duration
               </label>
-              <div className="grid grid-cols-4 gap-2">
-                {[15, 20, 30, 45].map((mins) => (
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                {[15, 20, 30, 45, 60].map((mins) => (
                   <button
                     type="button"
                     key={mins}
@@ -169,7 +204,7 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
             {/* Weekly Working Days & Hours */}
             <div className="space-y-3">
               <label className="text-xs font-bold text-[#355872] uppercase tracking-wider block">
-                Weekly Active Shifts
+                Weekly Active Shifts & Custom Times
               </label>
 
               <div className="space-y-2">
@@ -186,7 +221,10 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
                       <input
                         type="checkbox"
                         checked={d.active}
-                        onChange={() => toggleDay(d.dayOfWeek)}
+                        onChange={() => {
+                          toggleDay(d.dayOfWeek);
+                          setPreviewDayId(d.dayOfWeek);
+                        }}
                         className="w-4 h-4 rounded text-[#355872] focus:ring-[#9CD5FF] border-[#7AAACE]"
                       />
                       <span className={`text-xs font-bold ${d.active ? 'text-[#355872]' : 'text-[#4A6478]'}`}>
@@ -199,14 +237,20 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
                         <input
                           type="time"
                           value={d.startTime}
-                          onChange={(e) => updateTime(d.dayOfWeek, 'startTime', e.target.value)}
+                          onChange={(e) => {
+                            updateTime(d.dayOfWeek, 'startTime', e.target.value);
+                            setPreviewDayId(d.dayOfWeek);
+                          }}
                           className="px-2.5 py-1.5 rounded-lg border border-[#7AAACE] bg-[#F7F8F0] text-[#355872] font-semibold text-xs focus:outline-none focus:ring-1 focus:ring-[#9CD5FF]"
                         />
                         <span className="text-[#4A6478] font-bold">to</span>
                         <input
                           type="time"
                           value={d.endTime}
-                          onChange={(e) => updateTime(d.dayOfWeek, 'endTime', e.target.value)}
+                          onChange={(e) => {
+                            updateTime(d.dayOfWeek, 'endTime', e.target.value);
+                            setPreviewDayId(d.dayOfWeek);
+                          }}
                           className="px-2.5 py-1.5 rounded-lg border border-[#7AAACE] bg-[#F7F8F0] text-[#355872] font-semibold text-xs focus:outline-none focus:ring-1 focus:ring-[#9CD5FF]"
                         />
                       </div>
@@ -218,6 +262,38 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
               </div>
             </div>
 
+            {/* Live Generated Slots Preview */}
+            {selectedDayConfig?.active && (
+              <div className="p-4 rounded-2xl bg-[#F7F8F0] border border-[#7AAACE]/50 space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-[#355872]">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-[#355872]" />
+                    Live Generated Slots Preview ({selectedDayConfig.name})
+                  </span>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#9CD5FF]/60 border border-[#7AAACE]/60">
+                    {previewSlots.length} Bookable Slots
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pt-1">
+                  {previewSlots.length > 0 ? (
+                    previewSlots.map((slotTime, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-[#7AAACE]/50 text-[11px] font-bold text-[#355872] shadow-xs"
+                      >
+                        {slotTime}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-[#B5533C]">
+                      Invalid time range. End time must be later than start time.
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Save Shifts Button */}
             <div className="pt-2">
               <button
@@ -226,7 +302,7 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
                 className="w-full py-3 bg-[#355872] hover:bg-[#233B4D] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] disabled:opacity-50"
               >
                 <Save size={15} />
-                {isSaving ? 'Saving Changes...' : 'Save Availability & Shift Schedule'}
+                {isSaving ? 'Saving Changes...' : 'Save & Publish Generated Slots'}
               </button>
             </div>
           </form>
@@ -258,40 +334,46 @@ export default function DoctorScheduleModal({ isOpen, onClose }) {
               placeholder="Reason (e.g. Annual Medical Conference)"
               value={leaveReason}
               onChange={(e) => setLeaveReason(e.target.value)}
-              className="flex-1 px-3 py-2 bg-[#F7F8F0] border border-[#7AAACE] rounded-xl text-xs text-[#355872] placeholder-[#7AAACE] focus:outline-none focus:ring-1 focus:ring-[#9CD5FF]"
+              className="flex-1 px-3 py-2 bg-[#F7F8F0] border border-[#7AAACE] rounded-xl text-xs text-[#355872] focus:outline-none focus:ring-1 focus:ring-[#9CD5FF]"
             />
             <button
               type="submit"
-              className="px-4 py-2 bg-[#355872] hover:bg-[#233B4D] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0"
+              className="px-4 py-2 bg-[#355872] hover:bg-[#233B4D] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-[0.98]"
             >
               <Plus size={14} />
               Add Time Off
             </button>
           </form>
 
-          {/* List of existing leaves */}
+          {/* List of active leaves */}
           {scheduleData?.leaves?.length > 0 && (
-            <div className="space-y-1.5 pt-2">
-              {scheduleData.leaves.map((l) => (
-                <div
-                  key={l.id}
-                  className="p-2.5 rounded-xl bg-[#F7F8F0] border border-[#7AAACE]/50 flex items-center justify-between text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-[#355872]">
-                      {dayjs(l.date).format('MMMM D, YYYY')}
-                    </span>
-                    {l.reason && <span className="text-[#4A6478]">— {l.reason}</span>}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteLeave(l.id)}
-                    className="text-[#B5533C] hover:text-[#933D2A] p-1 rounded transition"
+            <div className="space-y-2 pt-2">
+              <div className="text-[11px] font-bold text-[#4A6478] uppercase tracking-wider">
+                Active Planned Leaves
+              </div>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {scheduleData.leaves.map((l) => (
+                  <div
+                    key={l.id}
+                    className="p-2.5 rounded-xl bg-[#F7F8F0] border border-[#7AAACE]/50 flex items-center justify-between text-xs"
                   >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))}
+                    <div>
+                      <span className="font-bold text-[#355872]">
+                        {dayjs(l.date).format('MMM D, YYYY')}
+                      </span>
+                      {l.reason && <span className="text-[#4A6478] ml-2">({l.reason})</span>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteLeave(l.id)}
+                      className="p-1 text-[#B5533C] hover:bg-[#B5533C]/10 rounded-lg transition"
+                      title="Cancel Leave"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
