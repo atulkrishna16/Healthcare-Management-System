@@ -3,6 +3,7 @@ const router = express.Router();
 const { google } = require('googleapis');
 const jwt = require('jsonwebtoken');
 const { authenticate } = require('../middleware/auth');
+const { calendarLimiter } = require('../middleware/rateLimiter');
 const prisma = require('../utils/prismaClient');
 const logger = require('../utils/logger');
 
@@ -17,6 +18,9 @@ function getOAuthClient() {
   }
   return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 }
+
+// Apply rate limiter to all calendar routes
+router.use(calendarLimiter);
 
 /**
  * GET /calendar/google/connect

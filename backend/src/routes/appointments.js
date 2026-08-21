@@ -82,6 +82,8 @@ router.post(
   }
 );
 
+const { aiLimiter } = require('../middleware/rateLimiter');
+
 // ─── SYMPTOMS ─────────────────────────────────────────────────────────────────
 /**
  * POST /appointments/:id/symptoms
@@ -91,6 +93,7 @@ router.post(
   '/:id/symptoms',
   authenticate,
   authorize('patient'),
+  aiLimiter,
   [body('symptoms').trim().isLength({ min: 10 }).withMessage('Please describe your symptoms (min 10 chars)')],
   validate,
   async (req, res) => {
@@ -147,15 +150,26 @@ Symptoms: ${symptoms}`;
 
   const result = await callLLM(prompt, preVisitSchema);
 
+  // Safe fallback if AI is rate limited or unavailable
+  const fallbackSummary = {
+    urgency: 'Medium',
+    chiefComplaint: symptoms.length > 100 ? `${symptoms.slice(0, 100)}...` : symptoms,
+    suggestedQuestions: [
+      'How long have these symptoms persisted?',
+      'Are the symptoms getting progressively worse or intermittent?',
+      'Are you experiencing any other related symptoms?',
+    ],
+  };
+
   await prisma.symptomForm.update({
     where: { appointmentId },
     data: {
-      aiSummary: result.status === 'ok' ? result.data : null,
+      aiSummary: result.status === 'ok' ? result.data : fallbackSummary,
       aiStatus: result.status === 'ok' ? 'ok' : 'failed',
     },
   });
 
-  logger.info(`Pre-visit LLM for appointment ${appointmentId}: ${result.status}`);
+  logger.info(`Pre-visit LLM for appointment ${appointmentId}: ${result.status} (Fallback active if failed)`);
 }
 
 // ─── CONFIRM ──────────────────────────────────────────────────────────────────
