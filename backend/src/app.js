@@ -9,11 +9,12 @@ const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
 
-// ── Routes ────────────────────────────────────────────────────────────────────
+// ── Route Imports ─────────────────────────────────────────────────────────────
 const authRoutes = require('./routes/auth');
 const doctorRoutes = require('./routes/doctors');
 const appointmentRoutes = require('./routes/appointments');
 const adminRoutes = require('./routes/admin');
+const googleCalendarRoutes = require('./routes/googleCalendar');
 
 const app = express();
 
@@ -26,7 +27,6 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 // Flexible CORS for Vercel deployments, custom domains, and local dev
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow server-to-server, curl, mobile, or missing origin
     if (!origin) return callback(null, true);
     
     const allowed = [
@@ -42,7 +42,6 @@ app.use(cors({
     ) {
       return callback(null, true);
     }
-    // Fallback allow for demo environments
     return callback(null, true);
   },
   credentials: true,
@@ -63,12 +62,6 @@ app.get('/health', (req, res) => {
 
 // ── Global API Rate Limiter ───────────────────────────────────────────────────
 app.use(apiLimiter);
-
-const authRoutes = require('./routes/auth');
-const doctorRoutes = require('./routes/doctors');
-const appointmentRoutes = require('./routes/appointments');
-const adminRoutes = require('./routes/admin');
-const googleCalendarRoutes = require('./routes/googleCalendar');
 
 // ── Route Groups ──────────────────────────────────────────────────────────────
 app.use('/auth', authLimiter, authRoutes);
