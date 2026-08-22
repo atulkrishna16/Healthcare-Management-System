@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, param, query } = require('express-validator');
 const adminController = require('../controllers/adminController');
 const { authenticate, authorize } = require('../middleware/auth');
+const { healthCheckLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 
 // All admin routes require admin authentication & authorization
@@ -147,7 +148,7 @@ router.post(
 /**
  * Live System Health & Diagnostics
  */
-router.get('/health-check', adminController.checkSystemHealth);
+router.get('/health-check', healthCheckLimiter, adminController.checkSystemHealth);
 
 /**
  * Overall Statistics

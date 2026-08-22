@@ -106,11 +106,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Auto-run health check once on mount
-  useEffect(() => {
-    runHealthCheck();
-  }, []);
-
   // ── Admin Creation Mutation ──────────────────────────────────────────────────
   const createAdminMutation = useMutation({
     mutationFn: (data) => adminApi.createAdmin(data),

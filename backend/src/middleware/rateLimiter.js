@@ -46,4 +46,11 @@ module.exports = {
     10,
     'You are holding too many slots. Please complete or wait before holding another.'
   ),
+
+  // Diagnostics / Health Check: 10/min per IP — protects DB & Redis from ping flooding
+  healthCheckLimiter: createLimiter(
+    60 * 1000,
+    10,
+    'Too many diagnostics requests. Please wait a moment before testing again.'
+  ),
 };
