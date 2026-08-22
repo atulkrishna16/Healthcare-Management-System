@@ -279,7 +279,7 @@ export default function PatientLayout() {
       )}
 
       {/* ── Main Scrollable Viewport (Full breadth for patient dashboards and views) ── */}
-      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-10 md:ml-16 overflow-y-auto w-full">
+      <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 md:ml-16 overflow-y-auto w-full">
         <Outlet />
       </main>
     </div>

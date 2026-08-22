@@ -69,19 +69,19 @@ export default function RegisterPage() {
         />
       </div>
 
-      <div className="relative z-10 w-full max-w-[440px] px-4 py-8">
-        <div className="bg-white/95 backdrop-blur-sm border border-[#7AAACE]/60 rounded-3xl p-8 sm:p-10 shadow-[0_10px_25px_-3px_rgba(53,88,114,0.15)]">
+      <div className="relative z-10 w-full max-w-[440px] px-3.5 sm:px-4 py-4 sm:py-8">
+        <div className="bg-white/95 backdrop-blur-sm border border-[#7AAACE]/60 rounded-2xl sm:rounded-3xl p-5 sm:p-10 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.1)]">
           
           {/* Logo & Header */}
-          <div className="text-center mb-8">
-            <Link to="/" className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#9CD5FF]/30 border border-[#7AAACE]/50 text-[#355872] text-xs font-bold tracking-wider uppercase mb-3 hover:bg-[#9CD5FF]/50 transition">
+          <div className="text-center mb-6 sm:mb-8">
+            <Link to="/" className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#9CD5FF]/30 border border-[#7AAACE]/50 text-[#355872] text-[11px] sm:text-xs font-bold tracking-wider uppercase mb-2.5 hover:bg-[#9CD5FF]/50 transition">
               <HeartPulse size={13} className="text-[#355872]" />
               HMS Clinical Portal
             </Link>
-            <h1 className="text-3xl font-extrabold text-[#355872] tracking-tight font-display">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#355872] tracking-tight font-display">
               HMS
             </h1>
-            <p className="text-xs font-semibold text-[#4A6478] tracking-wide uppercase mt-0.5">
+            <p className="text-[11px] sm:text-xs font-semibold text-[#4A6478] tracking-wide uppercase mt-0.5">
               Create Your Patient Account
             </p>
           </div>
@@ -91,7 +91,7 @@ export default function RegisterPage() {
             type="button"
             onClick={handleGoogleSignUp}
             disabled={googleLoading}
-            className="w-full py-3 px-4 mb-5 bg-white hover:bg-[#F7F8F0] border border-[#7AAACE] rounded-xl font-bold text-sm text-[#355872] transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-60"
+            className="w-full py-2.5 sm:py-3 px-4 mb-4 sm:mb-5 bg-white hover:bg-[#F7F8F0] border border-[#7AAACE] rounded-xl font-bold text-xs sm:text-sm text-[#355872] transition-all shadow-xs active:scale-[0.98] flex items-center justify-center gap-2.5 disabled:opacity-60"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path

@@ -76,28 +76,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleDemoLogin = async (role) => {
-    const demos = {
-      patient: { email: 'patient@demo.com', password: 'password123' },
-      doctor: { email: 'doctor@demo.com', password: 'password123' },
-      admin: { email: 'admin@demo.com', password: 'password123' },
-    };
-    setForm(demos[role]);
-    setLoading(true);
-    setError('');
-    try {
-      const user = await login(demos[role]);
-      toast.success(`Logged in as Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`);
-      navigate(`/${user.role}`);
-    } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Demo login failed';
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#F7F8F0]">
       {/* Autonomous Background ColorBends Animation */}
@@ -118,19 +96,19 @@ export default function LoginPage() {
         />
       </div>
 
-      <div className="relative z-10 w-full max-w-[440px] px-4 py-8">
-        <div className="bg-white/95 backdrop-blur-sm border border-[#7AAACE]/60 rounded-3xl p-8 sm:p-10 shadow-[0_10px_25px_-3px_rgba(53,88,114,0.15)]">
+      <div className="relative z-10 w-full max-w-[440px] px-3.5 sm:px-4 py-4 sm:py-8">
+        <div className="bg-white/95 backdrop-blur-sm border border-[#7AAACE]/60 rounded-2xl sm:rounded-3xl p-5 sm:p-10 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.1)]">
           
           {/* Logo & Header */}
-          <div className="text-center mb-8">
-            <Link to="/" className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#9CD5FF]/30 border border-[#7AAACE]/50 text-[#355872] text-xs font-bold tracking-wider uppercase mb-3 hover:bg-[#9CD5FF]/50 transition">
+          <div className="text-center mb-6 sm:mb-8">
+            <Link to="/" className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#9CD5FF]/30 border border-[#7AAACE]/50 text-[#355872] text-[11px] sm:text-xs font-bold tracking-wider uppercase mb-2.5 hover:bg-[#9CD5FF]/50 transition">
               <HeartPulse size={13} className="text-[#355872]" />
               HMS Clinical Portal
             </Link>
-            <h1 className="text-3xl font-extrabold text-[#355872] tracking-tight font-display">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#355872] tracking-tight font-display">
               HMS
             </h1>
-            <p className="text-xs font-semibold text-[#4A6478] tracking-wide uppercase mt-0.5">
+            <p className="text-[11px] sm:text-xs font-semibold text-[#4A6478] tracking-wide uppercase mt-0.5">
               Healthcare Management System
             </p>
           </div>
@@ -140,7 +118,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full py-3 px-4 mb-5 bg-white hover:bg-[#F7F8F0] border border-[#7AAACE] rounded-xl font-bold text-sm text-[#355872] transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-60"
+            className="w-full py-2.5 sm:py-3 px-4 mb-4 sm:mb-5 bg-white hover:bg-[#F7F8F0] border border-[#7AAACE] rounded-xl font-bold text-xs sm:text-sm text-[#355872] transition-all shadow-xs active:scale-[0.98] flex items-center justify-center gap-2.5 disabled:opacity-60"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -224,7 +202,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-[#355872] hover:bg-[#233B4D] text-white rounded-xl font-bold text-sm transition-all shadow-[0_4px_12px_rgba(53,88,114,0.2)] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-[#355872] hover:bg-[#233B4D] text-white rounded-xl font-bold text-sm transition-all shadow-[0_4px_12px_rgba(53,88,114,0.2)] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? 'Authenticating...' : 'Sign In'}
               <ArrowRight size={16} />
@@ -236,42 +214,9 @@ export default function LoginPage() {
             <p className="text-xs text-[#4A6478]">
               Don't have an account?{' '}
               <Link to="/register" className="font-bold text-[#355872] hover:underline">
-                Create Account
+                Create Patient Account
               </Link>
             </p>
-          </div>
-
-          {/* Quick Demo Logins */}
-          <div className="mt-6 pt-4 border-t border-[#7AAACE]/30">
-            <p className="text-[10px] uppercase font-bold text-[#4A6478] tracking-wider mb-2.5 text-center">
-              Quick One-Click Demo Access
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('patient')}
-                className="p-2 rounded-xl bg-[#F7F8F0] hover:bg-[#EEF0E5] border border-[#7AAACE]/50 text-xs font-bold text-[#355872] transition flex flex-col items-center gap-1 active:scale-[0.96]"
-              >
-                <User size={14} className="text-[#355872]" />
-                Patient
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('doctor')}
-                className="p-2 rounded-xl bg-[#F7F8F0] hover:bg-[#EEF0E5] border border-[#7AAACE]/50 text-xs font-bold text-[#355872] transition flex flex-col items-center gap-1 active:scale-[0.96]"
-              >
-                <Stethoscope size={14} className="text-[#355872]" />
-                Doctor
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('admin')}
-                className="p-2 rounded-xl bg-[#F7F8F0] hover:bg-[#EEF0E5] border border-[#7AAACE]/50 text-xs font-bold text-[#355872] transition flex flex-col items-center gap-1 active:scale-[0.96]"
-              >
-                <ShieldCheck size={14} className="text-[#355872]" />
-                Admin
-              </button>
-            </div>
           </div>
 
         </div>

@@ -269,7 +269,7 @@ export default function AdminLayout() {
       )}
 
       {/* ── Main Content Viewport (Expanded full breadth for system telemetry and staff tables) ── */}
-      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-10 md:ml-16 overflow-y-auto w-full">
+      <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 md:ml-16 overflow-y-auto w-full">
         <Outlet />
       </main>
     </div>

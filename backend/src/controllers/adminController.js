@@ -298,17 +298,34 @@ exports.updateDoctorSchedule = async (req, res) => {
 };
 
 exports.getStats = async (req, res) => {
-  const [totalDoctors, totalPatients, totalAppointments, failedNotifications] = await Promise.all([
+  const [totalDoctors, totalPatients, totalAppointments, failedNotifications, statusGroups, recentAppointments] = await Promise.all([
     prisma.doctorProfile.count(),
     prisma.user.count({ where: { role: 'patient' } }),
     prisma.appointment.count(),
     prisma.notification.count({ where: { status: 'failed' } }),
+    prisma.appointment.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    }),
+    prisma.appointment.findMany({
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        patient: { select: { id: true, name: true, email: true } },
+        doctor: {
+          include: {
+            user: { select: { id: true, name: true } },
+          },
+        },
+        symptomForm: { select: { aiSummary: true } },
+      },
+    }),
   ]);
 
-  const appointmentsByStatus = await prisma.appointment.groupBy({
-    by: ['status'],
-    _count: { _all: true },
-  });
+  const appointmentsByStatus = statusGroups.reduce((acc, curr) => {
+    acc[curr.status] = curr._count._all;
+    return acc;
+  }, {});
 
   res.json({
     totalDoctors,
@@ -316,5 +333,81 @@ exports.getStats = async (req, res) => {
     totalAppointments,
     failedNotifications,
     appointmentsByStatus,
+    recentAppointments,
   });
+};
+
+/**
+ * Admin User Management (Create more admins)
+ */
+exports.listAdmins = async (req, res) => {
+  const admins = await prisma.user.findMany({
+    where: { role: 'admin' },
+    select: { id: true, name: true, email: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json(admins);
+};
+
+exports.createAdmin = async (req, res) => {
+  const { email, name, password } = req.body;
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) return res.status(409).json({ error: 'An account with this email already exists' });
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const newAdmin = await prisma.user.create({
+    data: {
+      email,
+      name,
+      passwordHash,
+      role: 'admin',
+    },
+    select: { id: true, name: true, email: true, role: true, createdAt: true },
+  });
+
+  logger.info(`Executive Admin created new admin account: ${email} by ${req.user?.email || 'admin'}`);
+  res.status(201).json({ message: 'Admin account created successfully', admin: newAdmin });
+};
+
+/**
+ * Live System Diagnostics (Test DB & Redis on demand)
+ */
+exports.checkSystemHealth = async (req, res) => {
+  const result = {
+    timestamp: new Date().toISOString(),
+    db: { status: 'checking', latencyMs: null, provider: 'Supabase PostgreSQL' },
+    redis: { status: 'checking', latencyMs: null, provider: 'Upstash Redis' },
+    server: {
+      status: 'online',
+      uptimeSeconds: Math.floor(process.uptime()),
+      memoryMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      nodeEnv: process.env.NODE_ENV || 'development',
+    },
+  };
+
+  // Test Database Connection
+  try {
+    const dbStart = Date.now();
+    await prisma.$queryRaw`SELECT 1`;
+    result.db.status = 'online';
+    result.db.latencyMs = Date.now() - dbStart;
+  } catch (dbErr) {
+    result.db.status = 'offline';
+    result.db.error = dbErr.message;
+  }
+
+  // Test Redis Connection
+  try {
+    const { redisConnection } = require('../jobs/redisConnection');
+    const redisStart = Date.now();
+    await redisConnection.ping();
+    result.redis.status = 'online';
+    result.redis.latencyMs = Date.now() - redisStart;
+  } catch (redisErr) {
+    result.redis.status = 'offline';
+    result.redis.error = redisErr.message;
+  }
+
+  res.json(result);
 };

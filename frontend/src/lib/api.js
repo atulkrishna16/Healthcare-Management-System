@@ -97,6 +97,7 @@ export const googleCalendarApi = {
 // ── Admin ──────────────────────────────────────────────────────────────────
 export const adminApi = {
   stats: () => api.get('/admin/stats'),
+  getStats: () => api.get('/admin/stats'),
   getDoctors: () => api.get('/admin/doctors'),
   createDoctor: (data) => api.post('/admin/doctors', data),
   updateDoctor: (id, data) => api.patch(`/admin/doctors/${id}`, data),
@@ -108,6 +109,9 @@ export const adminApi = {
   deleteLeave: (doctorId, leaveId) => api.delete(`/admin/doctors/${doctorId}/leave/${leaveId}`),
   getNotifications: (params) => api.get('/admin/notifications', { params }),
   retryNotification: (id) => api.post(`/admin/notifications/${id}/retry`),
+  listAdmins: () => api.get('/admin/admins'),
+  createAdmin: (data) => api.post('/admin/admins', data),
+  checkHealth: () => api.get('/admin/health-check'),
 };
 
 export default api;

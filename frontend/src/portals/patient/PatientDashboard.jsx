@@ -37,25 +37,25 @@ export default function PatientDashboard() {
   return (
     <div className="space-y-8 w-full bg-[#F7F8F0] text-[#355872]">
       {/* Welcome Banner — Solid Ink & Paper Card */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#7AAACE]/60 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)] space-y-4">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#9CD5FF]/30 border border-[#7AAACE]/60 text-[#355872] text-xs font-bold">
-            <Sparkles size={13} className="text-[#355872]" />
+      <div className="p-4 sm:p-8 rounded-2xl sm:rounded-3xl bg-white border border-[#7AAACE]/60 shadow-[0_2px_12px_-2px_rgba(53,88,114,0.06)] space-y-3 sm:space-y-4">
+        <div className="space-y-1.5 sm:space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-[#9CD5FF]/30 border border-[#7AAACE]/60 text-[#355872] text-[11px] sm:text-xs font-bold">
+            <Sparkles size={12} className="text-[#355872]" />
             Personal Health Portal
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#355872] tracking-tight font-display">
+          <h1 className="text-xl sm:text-3xl font-extrabold text-[#355872] tracking-tight font-display">
             Welcome, {user?.name || 'Patient'}
           </h1>
           <p className="text-xs sm:text-sm text-[#4A6478] max-w-xl leading-relaxed">
             Schedule consultations with board-certified physicians, review clinical remarks, and track your active appointments.
           </p>
 
-          <div className="pt-2 flex items-center gap-3 flex-wrap">
+          <div className="pt-2 flex items-center gap-2.5 sm:gap-3 flex-wrap">
             <Link
               to="/patient/search"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#355872] hover:bg-[#233B4D] active:scale-[0.98] text-white text-xs font-bold transition shadow-[0_4px_12px_rgba(53,88,114,0.15)]"
+              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#355872] hover:bg-[#233B4D] active:scale-[0.98] text-white text-xs font-bold transition shadow-xs"
             >
-              <Search size={15} />
+              <Search size={14} />
               Find a Physician
             </Link>
 

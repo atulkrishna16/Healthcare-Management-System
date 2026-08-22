@@ -111,39 +111,39 @@ export default function DoctorDashboard() {
       />
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-        <div className="bg-white border border-[#7AAACE]/60 rounded-2xl p-5 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
-          <div className="text-2xl sm:text-3xl font-black text-[#355872] font-display">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+        <div className="bg-white border border-[#7AAACE]/60 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 shadow-[0_2px_12px_-2px_rgba(53,88,114,0.06)]">
+          <div className="text-xl sm:text-3xl font-black text-[#355872] font-display">
             {confirmedAppts.filter((a) => dayjs(a.slotStart).isSame(dayjs(), 'day')).length}
           </div>
-          <div className="text-[11px] font-bold text-[#4A6478] uppercase tracking-wider mt-1">
+          <div className="text-[10px] sm:text-[11px] font-bold text-[#4A6478] uppercase tracking-wider mt-0.5 sm:mt-1">
             Today's Visits
           </div>
         </div>
 
-        <div className="bg-white border border-[#7AAACE]/60 rounded-2xl p-5 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
-          <div className="text-2xl sm:text-3xl font-black text-[#355872] font-display">
+        <div className="bg-white border border-[#7AAACE]/60 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 shadow-[0_2px_12px_-2px_rgba(53,88,114,0.06)]">
+          <div className="text-xl sm:text-3xl font-black text-[#355872] font-display">
             {confirmedAppts.length}
           </div>
-          <div className="text-[11px] font-bold text-[#4A6478] uppercase tracking-wider mt-1">
+          <div className="text-[10px] sm:text-[11px] font-bold text-[#4A6478] uppercase tracking-wider mt-0.5 sm:mt-1">
             Total Confirmed
           </div>
         </div>
 
-        <div className="bg-white border border-[#B5533C]/40 rounded-2xl p-5 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
-          <div className="text-2xl sm:text-3xl font-black text-[#B5533C] font-display">
+        <div className="bg-white border border-[#B5533C]/40 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 shadow-[0_2px_12px_-2px_rgba(53,88,114,0.06)]">
+          <div className="text-xl sm:text-3xl font-black text-[#B5533C] font-display">
             {confirmedAppts.filter((a) => a.symptomForm?.aiSummary?.urgency === 'High').length}
           </div>
-          <div className="text-[11px] font-bold text-[#B5533C] uppercase tracking-wider mt-1">
+          <div className="text-[10px] sm:text-[11px] font-bold text-[#B5533C] uppercase tracking-wider mt-0.5 sm:mt-1">
             High Urgency
           </div>
         </div>
 
-        <div className="bg-white border border-[#7AAACE]/60 rounded-2xl p-5 shadow-[0_4px_20px_-2px_rgba(53,88,114,0.08)]">
-          <div className="text-2xl sm:text-3xl font-black text-[#355872] font-display">
+        <div className="bg-white border border-[#7AAACE]/60 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 shadow-[0_2px_12px_-2px_rgba(53,88,114,0.06)]">
+          <div className="text-xl sm:text-3xl font-black text-[#355872] font-display">
             {appointments.filter((a) => a.status === 'completed').length}
           </div>
-          <div className="text-[11px] font-bold text-[#4A6478] uppercase tracking-wider mt-1">
+          <div className="text-[10px] sm:text-[11px] font-bold text-[#4A6478] uppercase tracking-wider mt-0.5 sm:mt-1">
             Completed Visits
           </div>
         </div>

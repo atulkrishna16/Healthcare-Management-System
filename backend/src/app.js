@@ -32,22 +32,25 @@ app.set('trust proxy', 1);
 // ── Security & Parsing ────────────────────────────────────────────────────────
 app.use(helmet()); // No overrides — keep all defaults including CORP
 
-// Strict CORS — only explicitly listed origins are allowed
+// Robust CORS — supports configured FRONTEND_URL, Vercel deployments, and local dev
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (curl, mobile apps, server-to-server)
     if (!origin) return callback(null, true);
 
+    const frontendUrl = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/+$/, '') : null;
     const allowed = [
-      process.env.FRONTEND_URL,
-      // Development fallbacks only — in production set FRONTEND_URL to your exact domain
-      ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:5173', 'http://localhost:3000'] : []),
+      frontendUrl,
+      'http://localhost:5173',
+      'http://localhost:3000',
     ].filter(Boolean);
 
-    // NOTE: Do NOT add a wildcard *.vercel.app match here —
-    // any attacker who deploys any project to Vercel would satisfy that check.
-    // Use FRONTEND_URL=https://your-app.vercel.app in your production env instead.
-    if (allowed.includes(origin)) {
+    const normalizedOrigin = origin.replace(/\/+$/, '');
+
+    if (
+      allowed.includes(normalizedOrigin) ||
+      normalizedOrigin.endsWith('.vercel.app')
+    ) {
       return callback(null, true);
     }
 

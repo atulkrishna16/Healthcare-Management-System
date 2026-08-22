@@ -129,6 +129,27 @@ router.post(
 );
 
 /**
+ * Admin User Management (Create more admins)
+ */
+router.get('/admins', adminController.listAdmins);
+
+router.post(
+  '/admins',
+  [
+    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+    body('name').trim().notEmpty().isLength({ min: 2, max: 100 }).withMessage('Name must be 2–100 characters'),
+    body('password').isString().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  ],
+  validate,
+  adminController.createAdmin
+);
+
+/**
+ * Live System Health & Diagnostics
+ */
+router.get('/health-check', adminController.checkSystemHealth);
+
+/**
  * Overall Statistics
  */
 router.get('/stats', adminController.getStats);
