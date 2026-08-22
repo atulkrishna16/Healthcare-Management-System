@@ -39,14 +39,30 @@ const queryClient = new QueryClient({
 });
 
 /**
- * RequireRole — single route guard for the entire app.
- * loading → null (suppress flash), not authed → /login, wrong role → own portal.
+ * RequireRole — guards role-specific portals (Patient, Doctor, Admin).
+ *  - loading: renders null to prevent flash while restoring session
+ *  - not logged in: redirects to /login
+ *  - logged in with different role: redirects to their own portal
+ *  - logged in with required role: renders children
  */
 function RequireRole({ role, children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== role) return <Navigate to={`/${user.role}`} replace />;
+  return children;
+}
+
+/**
+ * GuestOnlyRoute — prevents logged-in users from accessing /login or /register.
+ *  - loading: renders null
+ *  - logged in: redirects to their respective portal
+ *  - not logged in: renders children (Login/Register)
+ */
+function GuestOnlyRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user) return <Navigate to={`/${user.role}`} replace />;
   return children;
 }
 
@@ -71,8 +87,8 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
 
             {/* Auth — redirect away if already logged in */}
-            <Route path="/login" element={<RequireRole role={null}><LoginPage /></RequireRole>} />
-            <Route path="/register" element={<RequireRole role={null}><RegisterPage /></RequireRole>} />
+            <Route path="/login" element={<GuestOnlyRoute><LoginPage /></GuestOnlyRoute>} />
+            <Route path="/register" element={<GuestOnlyRoute><RegisterPage /></GuestOnlyRoute>} />
 
             {/* Patient Portal — patients only */}
             <Route path="/patient" element={<RequireRole role="patient"><PatientLayout /></RequireRole>}>
