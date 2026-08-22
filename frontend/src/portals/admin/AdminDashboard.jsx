@@ -502,7 +502,7 @@ export default function AdminDashboard() {
             <p>New bookings made by patients or doctors will appear here in real time.</p>
           </div>
         ) : (
-          <div className="divide-y divide-[#7AAACE]/20">
+          <div className="divide-y divide-[#7AAACE]/20 max-h-[380px] sm:max-h-[440px] overflow-y-auto pr-1">
             {recentAppointments.map((appt) => {
               const statusColors = {
                 confirmed: 'bg-[#9CD5FF] text-[#355872] border-[#7AAACE]',

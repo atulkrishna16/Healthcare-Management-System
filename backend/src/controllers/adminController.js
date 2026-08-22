@@ -308,7 +308,7 @@ exports.getStats = async (req, res) => {
       _count: { _all: true },
     }),
     prisma.appointment.findMany({
-      take: 10,
+      take: 25,
       orderBy: { createdAt: 'desc' },
       include: {
         patient: { select: { id: true, name: true, email: true } },
